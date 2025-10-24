@@ -41,7 +41,7 @@ class _CameraPreviewState extends State<CameraPreview> {
   @override
   Widget build(BuildContext context) {
     final initialized = widget.camera.initialized;
-    if (!initialized) return const CircularProgressIndicator();
+    if (!initialized) return const Center(child: CircularProgressIndicator());
 
     final id = widget.camera.id;
     if (id == null) return const Icon(Icons.warning);

@@ -1,5 +1,6 @@
 package my.alexl.multicamera
 
+import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 
@@ -7,18 +8,41 @@ class Registry(val plugin: MulticameraPlugin) {
     val cameras = HashMap<Long, Camera>()
     val cameraHandles = HashMap<CameraDirection, CameraHandle>()
 
-    fun registerCamera(direction: CameraDirection, paused: Boolean): Long {
-        val camera = Camera(plugin, direction, paused)
+    fun registerCamera(
+        direction: CameraDirection,
+        paused: Boolean,
+        recognizeText: Boolean,
+        scanBarcodes: Boolean,
+        detectFaces: Boolean
+    ): Long {
+        val camera = Camera(
+            plugin,
+            direction,
+            paused,
+            recognizeText,
+            scanBarcodes,
+            detectFaces
+        )
         cameras[camera.id] = camera
         reconcile()
 
         return camera.id
     }
 
-    fun updateCamera(id: Long, direction: CameraDirection, paused: Boolean) {
+    fun updateCamera(
+        id: Long,
+        direction: CameraDirection,
+        paused: Boolean,
+        recognizeText: Boolean,
+        scanBarcodes: Boolean,
+        detectFaces: Boolean
+    ) {
         cameras[id]?.let {
             it.direction = direction
             it.paused = paused
+            it.recognizeText = recognizeText
+            it.scanBarcodes = scanBarcodes
+            it.detectFaces = detectFaces
             reconcile()
         }
     }
@@ -60,8 +84,10 @@ class Registry(val plugin: MulticameraPlugin) {
                 val handle = cameraHandles.computeIfAbsent(direction) {
                     CameraHandle(
                         plugin,
-                        direction
-                    ) { updateFlutterCameras(direction) }
+                        direction,
+                        onStateChanged = { updateFlutterCameras(direction) },
+                        onRecognitionImage = { onRecognitionImage(it, direction) }
+                    )
                 }
                 handle.surfaceProducers = cameras.filter { !it.paused }.map { it.surfaceProducer }
             } else {
@@ -85,6 +111,34 @@ class Registry(val plugin: MulticameraPlugin) {
                         "quarterTurns" to handle.quarterTurns
                     )
                 )
+            }
+        }
+    }
+
+    private fun onRecognitionImage(bitmap: Bitmap, direction: CameraDirection) {
+        val cameras = cameras.values.filter { it.direction == direction }
+        val recognizeText = cameras.any { it.recognizeText }
+        val scanBarcodes = cameras.any { it.scanBarcodes }
+        val detectFaces = cameras.any { it.detectFaces }
+
+        ImageRecognition.recognizeImage(
+            bitmap,
+            recognizeText,
+            scanBarcodes,
+            detectFaces
+        ) { results ->
+            for (camera in cameras) {
+                Handler(Looper.getMainLooper()).post {
+                    plugin.channel.invokeMethod(
+                        "recognitionResults",
+                        mapOf(
+                            "id" to camera.id,
+                            "text" to results.text,
+                            "barcodes" to results.barcodes,
+                            "face" to results.face
+                        )
+                    )
+                }
             }
         }
     }

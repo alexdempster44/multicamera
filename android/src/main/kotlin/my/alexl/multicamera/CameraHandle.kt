@@ -3,7 +3,10 @@ package my.alexl.multicamera
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.ImageFormat
+import android.graphics.Matrix
 import android.graphics.SurfaceTexture
 import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
@@ -27,6 +30,7 @@ class CameraHandle(
     val plugin: MulticameraPlugin,
     val direction: CameraDirection,
     val onStateChanged: () -> Unit,
+    val onRecognitionImage: (Bitmap) -> Unit,
 ) : Closeable, CameraDevice.StateCallback() {
     var surfaceProducers = listOf<TextureRegistry.SurfaceProducer>()
         set(value) {
@@ -45,6 +49,8 @@ class CameraHandle(
     private var session: CameraCaptureSession? = null
     private var captureInProgress: Boolean = false
     private var pendingCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
+    private var recognitionImageReader: ImageReader? = null
+    private var lastRecognitionTime: Long = 0
 
     private val cameraManager: CameraManager by lazy {
         plugin.context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -92,8 +98,43 @@ class CameraHandle(
                 // Session closed
             }
 
+            recognitionImageReader?.close()
+            recognitionImageReader = null
             return
         }
+
+        val imageReader = ImageReader.newInstance(
+            (size.width * 0.2).toInt(),
+            (size.height * 0.2).toInt(),
+            ImageFormat.JPEG,
+            2
+        )
+
+        imageReader.setOnImageAvailableListener({ reader ->
+            val now = System.currentTimeMillis()
+            if (now - lastRecognitionTime < 200) return@setOnImageAvailableListener
+            lastRecognitionTime = now
+
+            val image = reader.acquireLatestImage()
+            if (image == null) return@setOnImageAvailableListener
+
+            try {
+                val buffer = image.planes[0].buffer
+                val bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+
+                val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                if (bitmap != null) {
+                    val rotatedBitmap = rotateBitmap(bitmap, quarterTurns * 90)
+                    onRecognitionImage(rotatedBitmap)
+                }
+            } finally {
+                image.close()
+            }
+        }, handler)
+
+        recognitionImageReader?.close()
+        recognitionImageReader = imageReader
 
         val outputConfiguration = OutputConfiguration(surfaces.first())
         outputConfiguration.enableSurfaceSharing()
@@ -105,7 +146,7 @@ class CameraHandle(
 
         val sessionConfiguration = SessionConfiguration(
             SessionConfiguration.SESSION_REGULAR,
-            listOf(outputConfiguration),
+            listOf(outputConfiguration, OutputConfiguration(imageReader.surface)),
             { handler.post(it) },
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(captureSession: CameraCaptureSession) {
@@ -116,6 +157,7 @@ class CameraHandle(
                             .createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
                             .apply {
                                 surfaces.forEach { addTarget(it) }
+                                addTarget(imageReader.surface)
                             }
 
                         captureSession.setRepeatingRequest(request.build(), null, null)
@@ -269,6 +311,14 @@ class CameraHandle(
         quarterTurns = rotation / 90
     }
 
+    private fun rotateBitmap(bitmap: Bitmap, degrees: Int): Bitmap {
+        if (degrees == 0) return bitmap
+
+        val matrix = Matrix()
+        matrix.postRotate(degrees.toFloat())
+        return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+    }
+
     private fun completeCapture(image: ByteArray?) {
         val callbacks = pendingCaptureCallbacks.toList()
         pendingCaptureCallbacks.clear()
@@ -280,6 +330,8 @@ class CameraHandle(
     }
 
     private fun closeDevice() {
+        recognitionImageReader?.close()
+        recognitionImageReader = null
         device?.close()
         device = null
     }

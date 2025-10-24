@@ -6,6 +6,9 @@ class Camera: NSObject, FlutterTexture {
     private(set) var id: Int64!
     var direction: Direction
     var paused: Bool
+    var recognizeText: Bool
+    var scanBarcodes: Bool
+    var detectFaces: Bool
 
     private let lock = NSLock()
     private var latestPixelBuffer: CVPixelBuffer?
@@ -13,11 +16,17 @@ class Camera: NSObject, FlutterTexture {
     init(
         plugin: MulticameraPlugin,
         direction: Direction,
-        paused: Bool
+        paused: Bool,
+        recognizeText: Bool,
+        scanBarcodes: Bool,
+        detectFaces: Bool
     ) {
         self.plugin = plugin
         self.direction = direction
         self.paused = paused
+        self.recognizeText = recognizeText
+        self.scanBarcodes = scanBarcodes
+        self.detectFaces = detectFaces
         super.init()
 
         id = plugin.textures.register(self)

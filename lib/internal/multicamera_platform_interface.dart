@@ -19,11 +19,22 @@ abstract class MulticameraPlatform extends PlatformInterface {
     _instance = instance;
   }
 
-  Future<int?> registerCamera(CameraDirection direction, bool paused) =>
-      throw UnimplementedError();
+  Future<int?> registerCamera(
+    CameraDirection direction,
+    bool paused,
+    bool recognizeText,
+    bool scanBarcodes,
+    bool detectFaces,
+  ) => throw UnimplementedError();
 
-  Future<void> updateCamera(int id, CameraDirection direction, bool paused) =>
-      throw UnimplementedError();
+  Future<void> updateCamera(
+    int id,
+    CameraDirection direction,
+    bool paused,
+    bool recognizeText,
+    bool scanBarcodes,
+    bool detectFaces,
+  ) => throw UnimplementedError();
 
   Future<Uint8List?> captureImage(int id) => throw UnimplementedError();
 

@@ -6,7 +6,10 @@ import java.io.Closeable
 class Camera(
     plugin: MulticameraPlugin,
     var direction: CameraDirection,
-    var paused: Boolean
+    var paused: Boolean,
+    var recognizeText: Boolean,
+    var scanBarcodes: Boolean,
+    var detectFaces: Boolean
 ) : Closeable {
     val surfaceProducer: TextureRegistry.SurfaceProducer =
         plugin.textureRegistry.createSurfaceProducer()

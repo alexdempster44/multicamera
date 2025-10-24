@@ -5,6 +5,10 @@ import 'package:flutter/widgets.dart';
 import 'package:multicamera/internal/multicamera_platform_interface.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+typedef TextRecognizedCallback = void Function(List<String>);
+typedef BarcodesScannedCallback = void Function(List<String>);
+typedef FaceDetectedCallback = void Function(bool);
+
 class Camera extends ChangeNotifier {
   static final _instances = <int, Camera>{};
 
@@ -14,6 +18,9 @@ class Camera extends ChangeNotifier {
   int? _id;
   CameraDirection _direction;
   bool _paused;
+  TextRecognizedCallback? _onTextRecognized;
+  BarcodesScannedCallback? _onBarcodesScanned;
+  FaceDetectedCallback? _onFaceDetected;
   (int, int) _size = (0, 0);
   int _quarterTurns = 0;
 
@@ -23,21 +30,31 @@ class Camera extends ChangeNotifier {
   CameraDirection get direction => _direction;
   set direction(CameraDirection value) {
     _direction = value;
-    notifyListeners();
-
-    if (_id case final id?) {
-      MulticameraPlatform.instance.updateCamera(id, _direction, _paused);
-    }
+    _updateCamera();
   }
 
   bool get paused => _paused;
   set paused(bool value) {
     _paused = value;
-    notifyListeners();
+    _updateCamera();
+  }
 
-    if (_id case final id?) {
-      MulticameraPlatform.instance.updateCamera(id, _direction, _paused);
-    }
+  TextRecognizedCallback? get onTextRecognized => _onTextRecognized;
+  set onTextRecognized(TextRecognizedCallback value) {
+    _onTextRecognized = value;
+    _updateCamera();
+  }
+
+  BarcodesScannedCallback? get onBarcodesScanned => _onBarcodesScanned;
+  set onBarcodesScanned(BarcodesScannedCallback value) {
+    _onBarcodesScanned = value;
+    _updateCamera();
+  }
+
+  FaceDetectedCallback? get onFaceDetected => _onFaceDetected;
+  set onFaceDetected(FaceDetectedCallback value) {
+    _onFaceDetected = value;
+    _updateCamera();
   }
 
   (int, int) get size => _size;
@@ -65,6 +82,27 @@ class Camera extends ChangeNotifier {
     camera.notifyListeners();
   }
 
+  static void textRecognized(int id, List<String> text) {
+    final camera = Camera._instances[id];
+    if (camera == null) return;
+
+    camera.onTextRecognized?.call(text);
+  }
+
+  static void barcodesScanned(int id, List<String> barcode) {
+    final camera = Camera._instances[id];
+    if (camera == null) return;
+
+    camera.onBarcodesScanned?.call(barcode);
+  }
+
+  static void faceDetected(int id, bool face) {
+    final camera = Camera._instances[id];
+    if (camera == null) return;
+
+    camera.onFaceDetected?.call(face);
+  }
+
   Future<void> initialize() async {
     if (_initializeLock != null) return;
     final completer = Completer<void>();
@@ -79,6 +117,9 @@ class Camera extends ChangeNotifier {
     final id = await MulticameraPlatform.instance.registerCamera(
       _direction,
       _paused,
+      _onTextRecognized != null,
+      _onBarcodesScanned != null,
+      _onFaceDetected != null,
     );
     if (id == null) return;
 
@@ -105,6 +146,24 @@ class Camera extends ChangeNotifier {
 
     cameraStatus = await Permission.camera.request();
     return cameraStatus.isGranted;
+  }
+
+  void _updateCamera() {
+    notifyListeners();
+
+    if (_initializeLock != null) throw StateError('Still initializing');
+
+    final id = _id;
+    if (id == null) return;
+
+    MulticameraPlatform.instance.updateCamera(
+      id,
+      _direction,
+      _paused,
+      _onTextRecognized != null,
+      _onBarcodesScanned != null,
+      _onFaceDetected != null,
+    );
   }
 
   @override

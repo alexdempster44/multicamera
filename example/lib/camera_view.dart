@@ -18,6 +18,9 @@ class CameraView extends StatefulWidget {
 
 class _CameraViewState extends State<CameraView> {
   late final Camera camera;
+  List<String>? text;
+  List<String>? barcodes;
+  bool? face;
 
   @override
   void initState() {
@@ -25,6 +28,9 @@ class _CameraViewState extends State<CameraView> {
 
     camera = Camera();
     camera.addListener(() => setState(() {}));
+    camera.onTextRecognized = (value) => setState(() => text = value);
+    camera.onBarcodesScanned = (value) => setState(() => barcodes = value);
+    camera.onFaceDetected = (value) => setState(() => face = value);
 
     camera.initialize();
   }
@@ -61,6 +67,9 @@ class _CameraViewState extends State<CameraView> {
                   widget.onCapture(image);
                 },
               ),
+              Text('Text: $text'),
+              Text('Barcodes: $barcodes'),
+              Text('Face: $face'),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 spacing: 16,

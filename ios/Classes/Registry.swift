@@ -10,11 +10,20 @@ class Registry {
         self.plugin = plugin
     }
 
-    func registerCamera(direction: Camera.Direction, paused: Bool) -> Int64 {
+    func registerCamera(
+        direction: Camera.Direction,
+        paused: Bool,
+        recognizeText: Bool,
+        scanBarcodes: Bool,
+        detectFaces: Bool
+    ) -> Int64 {
         let camera = Camera(
             plugin: plugin,
             direction: direction,
-            paused: paused
+            paused: paused,
+            recognizeText: recognizeText,
+            scanBarcodes: scanBarcodes,
+            detectFaces: detectFaces
         )
 
         cameras[camera.id] = camera
@@ -23,11 +32,21 @@ class Registry {
         return camera.id
     }
 
-    func updateCamera(id: Int64, direction: Camera.Direction, paused: Bool) {
+    func updateCamera(
+        id: Int64,
+        direction: Camera.Direction,
+        paused: Bool,
+        recognizeText: Bool,
+        scanBarcodes: Bool,
+        detectFaces: Bool
+    ) {
         guard let camera = cameras[id] else { return }
 
         camera.direction = direction
         camera.paused = paused
+        camera.recognizeText = recognizeText
+        camera.scanBarcodes = scanBarcodes
+        camera.detectFaces = detectFaces
 
         reconcile()
     }
@@ -54,17 +73,7 @@ class Registry {
             if handleRequired {
                 let handle =
                     cameraHandles[direction]
-                    ?? {
-                        let newHandle = CameraHandle(
-                            direction: direction,
-                            onOrientationChanged: { [weak self] in
-                                self?.updateFlutterCameras(direction)
-                            }
-                        )
-
-                        cameraHandles[direction] = newHandle
-                        return newHandle
-                    }()
+                    ?? createHandle(direction: direction)
 
                 handle.setCameras(cameras.filter { !$0.paused })
             } else {
@@ -72,6 +81,21 @@ class Registry {
             }
             self.updateFlutterCameras(direction)
         }
+    }
+
+    private func createHandle(direction: Camera.Direction) -> CameraHandle {
+        let handle = CameraHandle(
+            direction: direction,
+            onOrientationChanged: { [weak self] in
+                self?.updateFlutterCameras(direction)
+            },
+            onRecognitionImage: { [weak self] image in
+                self?.onRecognitionImage(image, direction: direction)
+            }
+        )
+
+        cameraHandles[direction] = handle
+        return handle
     }
 
     private func updateFlutterCameras(_ direction: Camera.Direction) {
@@ -92,5 +116,43 @@ class Registry {
                 )
             }
         }
+    }
+
+    private func onRecognitionImage(
+        _ image: UIImage,
+        direction: Camera.Direction
+    ) {
+        let cameras = self.cameras.values.filter { $0.direction == direction }
+        let recognizeText = cameras.contains { $0.recognizeText }
+        let scanBarcodes = cameras.contains { $0.scanBarcodes }
+        let detectFaces = cameras.contains { $0.detectFaces }
+
+        ImageRecognition.recognizeImage(
+            image,
+            recognizeText: recognizeText,
+            scanBarcodes: scanBarcodes,
+            detectFaces: detectFaces,
+            onResults: { [weak self] results in
+                guard let self = self else { return }
+                let cameras = self.cameras.values.filter {
+                    $0.direction == direction
+                }
+
+                for camera in cameras {
+                    guard let id = camera.id else { continue }
+                    DispatchQueue.main.async {
+                        self.plugin.channel.invokeMethod(
+                            "recognitionResults",
+                            arguments: [
+                                "id": id,
+                                "text": results.text as Any,
+                                "barcodes": results.barcodes as Any,
+                                "face": results.face as Any,
+                            ]
+                        )
+                    }
+                }
+            }
+        )
     }
 }

@@ -5,6 +5,7 @@ import UIKit
 class CameraHandle: AVCaptureVideoDataOutput {
     let direction: Camera.Direction
     let onOrientationChanged: (() -> Void)
+    let onRecognitionImage: ((UIImage) -> Void)
     let size = (1920, 1080)
     private(set) var quarterTurns: Int32 = 1
 
@@ -14,13 +15,16 @@ class CameraHandle: AVCaptureVideoDataOutput {
     private var cameras: [Camera] = []
     private var lastFrame: CVPixelBuffer?
     private let frameSemaphore = DispatchSemaphore(value: 0)
+    private var lastRecognitionTime: Date?
 
     init(
         direction: Camera.Direction,
-        onOrientationChanged: @escaping (() -> Void)
+        onOrientationChanged: @escaping (() -> Void),
+        onRecognitionImage: @escaping ((UIImage) -> Void)
     ) {
         self.direction = direction
         self.onOrientationChanged = onOrientationChanged
+        self.onRecognitionImage = onRecognitionImage
         self.queue = DispatchQueue(
             label: "my.alexl.multicamera.\(direction)",
             qos: .userInitiated
@@ -88,27 +92,9 @@ class CameraHandle: AVCaptureVideoDataOutput {
         }
 
         guard let pixelBuffer = lastFrame else { return nil }
+        guard let image = convertDataToImage(pixelBuffer) else { return nil }
 
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        let cgImage = CIContext().createCGImage(ciImage, from: ciImage.extent)
-        if let cgImage = cgImage {
-            let orientation: UIImage.Orientation =
-                switch quarterTurns {
-                case 0: .up
-                case 1: .right
-                case 2: .down
-                case 3: .left
-                default: .up
-                }
-            let uiImage = UIImage(
-                cgImage: cgImage,
-                scale: 1.0,
-                orientation: orientation
-            )
-            return uiImage.jpegData(compressionQuality: 0.9)
-        }
-
-        return nil
+        return image.jpegData(compressionQuality: 0.9)
     }
 
     private func selectDevice() -> AVCaptureDevice? {
@@ -139,6 +125,34 @@ class CameraHandle: AVCaptureVideoDataOutput {
         for camera in cameras {
             camera.updateFrame(data)
         }
+
+        let now = Date()
+        let elapsed =
+            lastRecognitionTime?.timeIntervalSince(now) ?? Double.infinity
+
+        if abs(elapsed) < 0.2 { return }
+        if let image = convertDataToImage(data, scale: 0.2) {
+            self.lastRecognitionTime = now
+            onRecognitionImage(image)
+        }
+    }
+
+    private func convertDataToImage(
+        _ data: CVPixelBuffer,
+        scale: CGFloat = 1.0
+    ) -> UIImage? {
+        let transform = CGAffineTransform(scaleX: scale, y: scale)
+        let ci = CIImage(cvPixelBuffer: data).transformed(by: transform)
+
+        let rect = ci.extent.integral
+        guard let cg = CIContext().createCGImage(ci, from: rect) else {
+            return nil
+        }
+
+        let turn = Int(((quarterTurns % 4) + 4) % 4)
+        let orientation: UIImage.Orientation = [.up, .right, .down, .left][turn]
+
+        return UIImage(cgImage: cg, scale: 1.0, orientation: orientation)
     }
 
     @objc private func handleOrientationChange() {

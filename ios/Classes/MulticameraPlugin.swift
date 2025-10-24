@@ -36,7 +36,10 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
             let rawDirection = arguments["direction"] as! Int32
             let id = registry.registerCamera(
                 direction: Camera.Direction(rawValue: rawDirection)!,
-                paused: arguments["paused"] as! Bool
+                paused: arguments["paused"] as! Bool,
+                recognizeText: arguments["recognizeText"] as! Bool,
+                scanBarcodes: arguments["scanBarcodes"] as! Bool,
+                detectFaces: arguments["detectFaces"] as! Bool
             )
             result(NSNumber(value: id))
 
@@ -45,7 +48,10 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
             registry.updateCamera(
                 id: arguments["id"] as! Int64,
                 direction: Camera.Direction(rawValue: rawDirection)!,
-                paused: arguments["paused"] as! Bool
+                paused: arguments["paused"] as! Bool,
+                recognizeText: arguments["recognizeText"] as! Bool,
+                scanBarcodes: arguments["scanBarcodes"] as! Bool,
+                detectFaces: arguments["detectFaces"] as! Bool
             )
             result(nil)
 

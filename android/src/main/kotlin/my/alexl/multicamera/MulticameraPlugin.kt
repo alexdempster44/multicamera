@@ -41,7 +41,10 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 result.success(
                     registry.registerCamera(
                         CameraDirection.entries[call.argument<Int>("direction")!!],
-                        call.argument<Boolean>("paused")!!
+                        call.argument<Boolean>("paused")!!,
+                        call.argument<Boolean>("recognizeText")!!,
+                        call.argument<Boolean>("scanBarcodes")!!,
+                        call.argument<Boolean>("detectFaces")!!
                     )
                 )
 
@@ -50,6 +53,9 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     call.argument<Long>("id")!!,
                     CameraDirection.entries[call.argument<Int>("direction")!!],
                     call.argument<Boolean>("paused")!!,
+                    call.argument<Boolean>("recognizeText")!!,
+                    call.argument<Boolean>("scanBarcodes")!!,
+                    call.argument<Boolean>("detectFaces")!!
                 )
                 result.success(null)
             }
