@@ -51,7 +51,7 @@ class _CameraViewState extends State<CameraView> {
           builder: (_, constraints) => Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
+              Flexible(
                 child: Container(
                   decoration: BoxDecoration(border: Border.all()),
                   child: CameraPreview(camera: camera),

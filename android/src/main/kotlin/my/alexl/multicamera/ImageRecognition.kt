@@ -1,6 +1,6 @@
 package my.alexl.multicamera
 
-import android.graphics.Bitmap
+import android.media.Image
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
@@ -15,13 +15,17 @@ object ImageRecognition {
     private val faceDetector = FaceDetection.getClient(FaceDetectorOptions.Builder().build())
 
     fun recognizeImage(
-        bitmap: Bitmap,
+        image: Image,
         recognizeText: Boolean,
         scanBarcodes: Boolean,
         detectFaces: Boolean,
         onResults: (Results) -> Unit
     ) {
-        val image = InputImage.fromBitmap(bitmap, 0)
+        var recognizeText = recognizeText
+        var scanBarcodes = scanBarcodes
+        var detectFaces = detectFaces
+
+        val inputImage = InputImage.fromMediaImage(image, 0)
 
         var text: List<String>? = null
         var barcodes: List<String>? = null
@@ -32,26 +36,36 @@ object ImageRecognition {
             if (scanBarcodes && barcodes == null) return
             if (detectFaces && face == null) return
 
+            image.close()
             onResults(Results(text, barcodes, face))
         }
 
         if (recognizeText) {
-            textRecognizer.process(image).addOnSuccessListener { result ->
+            textRecognizer.process(inputImage).addOnSuccessListener { result ->
                 text = result.textBlocks.map { it.text }
+                checkComplete()
+            }.addOnFailureListener {
+                recognizeText = false
                 checkComplete()
             }
         }
 
         if (scanBarcodes) {
-            barcodeScanner.process(image).addOnSuccessListener { result ->
+            barcodeScanner.process(inputImage).addOnSuccessListener { result ->
                 barcodes = result.mapNotNull { it.rawValue }
+                checkComplete()
+            }.addOnFailureListener {
+                scanBarcodes = false
                 checkComplete()
             }
         }
 
         if (detectFaces) {
-            faceDetector.process(image).addOnSuccessListener { result ->
+            faceDetector.process(inputImage).addOnSuccessListener { result ->
                 face = result.isNotEmpty()
+                checkComplete()
+            }.addOnFailureListener {
+                detectFaces = false
                 checkComplete()
             }
         }

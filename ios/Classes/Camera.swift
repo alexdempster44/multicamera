@@ -38,17 +38,18 @@ class Camera: NSObject, FlutterTexture {
 
     func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
         lock.lock()
-        defer { lock.unlock() }
+        let buffer = latestPixelBuffer
+        lock.unlock()
 
-        guard let pb = latestPixelBuffer else { return nil }
-        return Unmanaged.passRetained(pb)
+        guard let buffer = buffer else { return nil }
+        return Unmanaged.passRetained(buffer)
     }
 
     func updateFrame(_ pixelBuffer: CVPixelBuffer) {
         lock.lock()
-        defer { lock.unlock() }
-
         latestPixelBuffer = pixelBuffer
+        lock.unlock()
+
         plugin.textures.textureFrameAvailable(id)
     }
 

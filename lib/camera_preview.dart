@@ -53,13 +53,10 @@ class _CameraPreviewState extends State<CameraPreview> {
         fit: widget.crop ? BoxFit.cover : BoxFit.contain,
         child: Transform.flip(
           flipX: frontCamera && widget.mirror,
-          child: RotatedBox(
-            quarterTurns: widget.camera.quarterTurns,
-            child: SizedBox(
-              width: widget.camera.size.$1.toDouble(),
-              height: widget.camera.size.$2.toDouble(),
-              child: Texture(textureId: id),
-            ),
+          child: SizedBox(
+            width: widget.camera.size.$1.toDouble(),
+            height: widget.camera.size.$2.toDouble(),
+            child: Texture(textureId: id),
           ),
         ),
       ),

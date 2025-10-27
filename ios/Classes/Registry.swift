@@ -27,7 +27,7 @@ class Registry {
         )
 
         cameras[camera.id] = camera
-        reconcile()
+        Task { reconcile() }
 
         return camera.id
     }
@@ -48,26 +48,30 @@ class Registry {
         camera.scanBarcodes = scanBarcodes
         camera.detectFaces = detectFaces
 
-        reconcile()
+        Task { reconcile() }
     }
 
-    func captureImage(id: Int64) -> Data? {
-        guard let camera = cameras[id] else { return nil }
-        guard let handle = cameraHandles[camera.direction] else { return nil }
+    func captureImage(id: Int64, _ callback: @escaping (Data?) -> Void) {
+        guard let camera = cameras[id] else {
+            callback(nil)
+            return
+        }
+        guard let handle = cameraHandles[camera.direction] else {
+            callback(nil)
+            return
+        }
 
-        return handle.captureImage()
+        handle.captureImage(callback)
     }
 
     func unregisterCamera(id: Int64) {
         cameras.removeValue(forKey: id)
-        reconcile()
+        Task { reconcile() }
     }
 
     private func reconcile() {
         for direction in Camera.Direction.allCases {
-            let cameras = self.cameras.values.filter {
-                $0.direction == direction
-            }
+            let cameras = cameras.values.filter { $0.direction == direction }
             let handleRequired = !cameras.isEmpty
 
             if handleRequired {
@@ -86,7 +90,7 @@ class Registry {
     private func createHandle(direction: Camera.Direction) -> CameraHandle {
         let handle = CameraHandle(
             direction: direction,
-            onOrientationChanged: { [weak self] in
+            onCameraUpdated: { [weak self] in
                 self?.updateFlutterCameras(direction)
             },
             onRecognitionImage: { [weak self] image in
@@ -100,18 +104,23 @@ class Registry {
 
     private func updateFlutterCameras(_ direction: Camera.Direction) {
         guard let handle = cameraHandles[direction] else { return }
-        let cameras = self.cameras.values.filter { $0.direction == direction }
+        let cameras = cameras.values.filter { $0.direction == direction }
+
+        var width = handle.size.0
+        var height = handle.size.1
+        if handle.quarterTurns % 2 == 1 {
+            swap(&width, &height)
+        }
 
         for camera in cameras {
             guard let id = camera.id else { continue }
-            DispatchQueue.main.async {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
                 self.plugin.channel.invokeMethod(
                     "updateCamera",
                     arguments: [
                         "id": id,
-                        "width": handle.size.0,
-                        "height": handle.size.1,
-                        "quarterTurns": handle.quarterTurns,
+                        "width": width,
+                        "height": height,
                     ]
                 )
             }
@@ -122,7 +131,10 @@ class Registry {
         _ image: UIImage,
         direction: Camera.Direction
     ) {
-        let cameras = self.cameras.values.filter { $0.direction == direction }
+        let cameras = cameras.values.filter {
+            $0.direction == direction && !$0.paused
+        }
+
         let recognizeText = cameras.contains { $0.recognizeText }
         let scanBarcodes = cameras.contains { $0.scanBarcodes }
         let detectFaces = cameras.contains { $0.detectFaces }
@@ -135,7 +147,7 @@ class Registry {
             onResults: { [weak self] results in
                 guard let self = self else { return }
                 let cameras = self.cameras.values.filter {
-                    $0.direction == direction
+                    $0.direction == direction && !$0.paused
                 }
 
                 for camera in cameras {

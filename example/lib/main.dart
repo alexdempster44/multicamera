@@ -31,7 +31,8 @@ class _HomeState extends State<Home> {
               children: [
                 IconButton.filled(
                   icon: Icon(Icons.remove),
-                  onPressed: () => setState(() => _viewCount--),
+                  onPressed: () =>
+                      setState(() => _viewCount = max(_viewCount - 1, 0)),
                 ),
                 IconButton.filled(
                   icon: Icon(Icons.add),
@@ -122,7 +123,7 @@ class _CameraViewList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (length < 0) {
+    if (length <= 0) {
       return Center(
         child: Text('No views setup'),
       );

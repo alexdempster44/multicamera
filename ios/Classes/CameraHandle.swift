@@ -4,26 +4,29 @@ import UIKit
 
 class CameraHandle: AVCaptureVideoDataOutput {
     let direction: Camera.Direction
-    let onOrientationChanged: (() -> Void)
+    let onCameraUpdated: (() -> Void)
     let onRecognitionImage: ((UIImage) -> Void)
-    let size = (1920, 1080)
+    private(set) var size: (Int32, Int32) = (1, 1)
     private(set) var quarterTurns: Int32 = 1
 
-    private let session = AVCaptureSession()
+    private static let session = AVCaptureMultiCamSession()
+    private static let sessionLock = NSLock()
+    private static var referenceCount = 0
+
     private let output = AVCaptureVideoDataOutput()
     private let queue: DispatchQueue
+    private let ciContext = CIContext()
     private var cameras: [Camera] = []
-    private var lastFrame: CVPixelBuffer?
-    private let frameSemaphore = DispatchSemaphore(value: 0)
+    private var pendingCaptureCallbacks: [(Data?) -> Void] = []
     private var lastRecognitionTime: Date?
 
     init(
         direction: Camera.Direction,
-        onOrientationChanged: @escaping (() -> Void),
+        onCameraUpdated: @escaping (() -> Void),
         onRecognitionImage: @escaping ((UIImage) -> Void)
     ) {
         self.direction = direction
-        self.onOrientationChanged = onOrientationChanged
+        self.onCameraUpdated = onCameraUpdated
         self.onRecognitionImage = onRecognitionImage
         self.queue = DispatchQueue(
             label: "my.alexl.multicamera.\(direction)",
@@ -49,35 +52,70 @@ class CameraHandle: AVCaptureVideoDataOutput {
     deinit {
         NotificationCenter.default.removeObserver(self)
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
-        session.stopRunning()
+
+        Self.sessionLock.lock()
+        defer { Self.sessionLock.unlock() }
+
+        Self.session.beginConfiguration()
+        Self.session.removeOutput(output)
+
+        for input in Self.session.inputs {
+            guard let deviceInput = input as? AVCaptureDeviceInput else {
+                continue
+            }
+
+            let position: AVCaptureDevice.Position =
+                switch direction {
+                case .front: .front
+                case .back: .back
+                }
+            if deviceInput.device.position != position { continue }
+
+            Self.session.removeInput(deviceInput)
+        }
+        Self.session.commitConfiguration()
+
+        Self.referenceCount -= 1
+        if Self.referenceCount == 0 {
+            Self.session.stopRunning()
+        }
     }
 
     private func initialize() throws {
-        session.beginConfiguration()
-        session.sessionPreset = .hd1920x1080
+        Self.sessionLock.lock()
+        defer { Self.sessionLock.unlock() }
+
+        Self.session.beginConfiguration()
 
         guard let device = selectDevice() else {
-            session.commitConfiguration()
+            Self.session.commitConfiguration()
             return
         }
 
         let input = try AVCaptureDeviceInput(device: device)
-        guard session.canAddInput(input) else {
-            session.commitConfiguration()
+        guard Self.session.canAddInput(input) else {
+            Self.session.commitConfiguration()
             return
         }
-        session.addInput(input)
+        Self.session.addInput(input)
 
         output.alwaysDiscardsLateVideoFrames = true
         output.setSampleBufferDelegate(self, queue: queue)
-        guard session.canAddOutput(output) else {
-            session.commitConfiguration()
+        guard Self.session.canAddOutput(output) else {
+            Self.session.commitConfiguration()
             return
         }
-        session.addOutput(output)
+        Self.session.addOutput(output)
 
-        session.commitConfiguration()
-        session.startRunning()
+        Self.session.commitConfiguration()
+
+        Self.referenceCount += 1
+        if Self.referenceCount == 1 {
+            Self.session.startRunning()
+        }
+
+        let dimensions = device.activeFormat.formatDescription.dimensions
+        size = (dimensions.width, dimensions.height)
 
         handleOrientationChange()
     }
@@ -86,15 +124,8 @@ class CameraHandle: AVCaptureVideoDataOutput {
         self.cameras = cameras
     }
 
-    func captureImage() -> Data? {
-        if lastFrame == nil {
-            frameSemaphore.wait()
-        }
-
-        guard let pixelBuffer = lastFrame else { return nil }
-        guard let image = convertDataToImage(pixelBuffer) else { return nil }
-
-        return image.jpegData(compressionQuality: 0.9)
+    func captureImage(_ callback: @escaping (Data?) -> Void) {
+        pendingCaptureCallbacks.append(callback)
     }
 
     private func selectDevice() -> AVCaptureDevice? {
@@ -120,10 +151,20 @@ class CameraHandle: AVCaptureVideoDataOutput {
     }
 
     private func onPixelBuffer(_ data: CVPixelBuffer) {
-        lastFrame = data
-        frameSemaphore.signal()
+        let data = rotatePixelBuffer(data, quarterTurns: quarterTurns) ?? data
+
         for camera in cameras {
             camera.updateFrame(data)
+        }
+
+        if !pendingCaptureCallbacks.isEmpty {
+            if let image = convertDataToImage(data) {
+                let imageData = image.jpegData(compressionQuality: 80)
+                for callback in pendingCaptureCallbacks {
+                    Task { callback(imageData) }
+                }
+                pendingCaptureCallbacks = []
+            }
         }
 
         let now = Date()
@@ -133,8 +174,44 @@ class CameraHandle: AVCaptureVideoDataOutput {
         if abs(elapsed) < 0.2 { return }
         if let image = convertDataToImage(data, scale: 0.2) {
             self.lastRecognitionTime = now
-            onRecognitionImage(image)
+            Task { onRecognitionImage(image) }
         }
+    }
+
+    private func rotatePixelBuffer(
+        _ pixelBuffer: CVPixelBuffer,
+        quarterTurns: Int32,
+    ) -> CVPixelBuffer? {
+        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+
+        let exif: Int32 =
+            switch Int(((quarterTurns % 4) + 4) % 4) {
+            case 0: 1
+            case 1: 6
+            case 2: 3
+            default: 8
+            }
+        let rotated = ciImage.oriented(forExifOrientation: exif)
+
+        var outputPixelBuffer: CVPixelBuffer?
+        let attributes: [CFString: Any] = [
+            kCVPixelBufferIOSurfacePropertiesKey: [:],
+            kCVPixelBufferMetalCompatibilityKey: true,
+        ]
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            Int(rotated.extent.width),
+            Int(rotated.extent.height),
+            kCVPixelFormatType_32BGRA,
+            attributes as CFDictionary,
+            &outputPixelBuffer
+        )
+        guard status == kCVReturnSuccess, let output = outputPixelBuffer else {
+            return nil
+        }
+
+        ciContext.render(rotated, to: output)
+        return output
     }
 
     private func convertDataToImage(
@@ -142,17 +219,14 @@ class CameraHandle: AVCaptureVideoDataOutput {
         scale: CGFloat = 1.0
     ) -> UIImage? {
         let transform = CGAffineTransform(scaleX: scale, y: scale)
-        let ci = CIImage(cvPixelBuffer: data).transformed(by: transform)
+        let ciImage = CIImage(cvPixelBuffer: data).transformed(by: transform)
 
-        let rect = ci.extent.integral
-        guard let cg = CIContext().createCGImage(ci, from: rect) else {
+        let rect = ciImage.extent.integral
+        guard let cg = ciContext.createCGImage(ciImage, from: rect) else {
             return nil
         }
 
-        let turn = Int(((quarterTurns % 4) + 4) % 4)
-        let orientation: UIImage.Orientation = [.up, .right, .down, .left][turn]
-
-        return UIImage(cgImage: cg, scale: 1.0, orientation: orientation)
+        return UIImage(cgImage: cg, scale: 1.0, orientation: .up)
     }
 
     @objc private func handleOrientationChange() {
@@ -178,7 +252,7 @@ class CameraHandle: AVCaptureVideoDataOutput {
                 (self.direction == .front && isLandscape) ? 2 : 0
 
             self.quarterTurns = (quarterTurns + adjustment) % 4
-            self.onOrientationChanged()
+            self.onCameraUpdated()
         }
     }
 }
@@ -192,6 +266,6 @@ extension CameraHandle: AVCaptureVideoDataOutputSampleBufferDelegate {
         guard let data = CMSampleBufferGetImageBuffer(sampleBuffer) else {
             return
         }
-        Task { onPixelBuffer(data) }
+        onPixelBuffer(data)
     }
 }

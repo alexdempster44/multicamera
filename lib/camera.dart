@@ -22,7 +22,6 @@ class Camera extends ChangeNotifier {
   BarcodesScannedCallback? _onBarcodesScanned;
   FaceDetectedCallback? _onFaceDetected;
   (int, int) _size = (0, 0);
-  int _quarterTurns = 0;
 
   bool get initialized => _initialized;
   int? get id => _id;
@@ -58,7 +57,6 @@ class Camera extends ChangeNotifier {
   }
 
   (int, int) get size => _size;
-  int get quarterTurns => _quarterTurns;
 
   Camera({
     CameraDirection direction = CameraDirection.front,
@@ -71,14 +69,6 @@ class Camera extends ChangeNotifier {
     if (camera == null) return;
 
     camera._size = size;
-    camera.notifyListeners();
-  }
-
-  static void setQuarterTurns(int id, int quarterTurns) {
-    final camera = Camera._instances[id];
-    if (camera == null) return;
-
-    camera._quarterTurns = quarterTurns;
     camera.notifyListeners();
   }
 
@@ -104,7 +94,8 @@ class Camera extends ChangeNotifier {
   }
 
   Future<void> initialize() async {
-    if (_initializeLock != null) return;
+    if (_initialized) return;
+    if (_initializeLock case final future?) return future;
     final completer = Completer<void>();
     _initializeLock = completer.future;
 
@@ -132,7 +123,7 @@ class Camera extends ChangeNotifier {
   }
 
   Future<Uint8List?> captureImage() async {
-    if (!_initialized) throw StateError('Not initialized');
+    await _ensureInitialized();
 
     final id = _id;
     if (id == null) return null;
@@ -146,6 +137,13 @@ class Camera extends ChangeNotifier {
 
     cameraStatus = await Permission.camera.request();
     return cameraStatus.isGranted;
+  }
+
+  Future<void> _ensureInitialized() async {
+    if (_initialized) return;
+    if (_initializeLock case final future?) return future;
+
+    throw StateError('Not initialized');
   }
 
   void _updateCamera() {

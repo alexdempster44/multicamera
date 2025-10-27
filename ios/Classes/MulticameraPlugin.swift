@@ -57,11 +57,16 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
 
         case "captureImage":
             let id = arguments["id"] as! Int64
-            if let image = registry.captureImage(id: id) {
-                result(FlutterStandardTypedData(bytes: image))
-            } else {
-                result(nil)
-            }
+            registry.captureImage(
+                id: id,
+                { image in
+                    if let image = image {
+                        result(FlutterStandardTypedData(bytes: image))
+                    } else {
+                        result(nil)
+                    }
+                }
+            )
 
         case "unregisterCamera":
             registry.unregisterCamera(id: arguments["id"] as! Int64)

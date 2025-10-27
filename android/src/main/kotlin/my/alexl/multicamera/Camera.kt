@@ -5,7 +5,7 @@ import java.io.Closeable
 
 class Camera(
     plugin: MulticameraPlugin,
-    var direction: CameraDirection,
+    var direction: Direction,
     var paused: Boolean,
     var recognizeText: Boolean,
     var scanBarcodes: Boolean,
@@ -20,9 +20,9 @@ class Camera(
     override fun close() {
         surfaceProducer.release()
     }
-}
 
-enum class CameraDirection {
-    Front,
-    Back
+    enum class Direction {
+        Front,
+        Back
+    }
 }

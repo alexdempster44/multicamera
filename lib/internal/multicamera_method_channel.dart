@@ -24,10 +24,8 @@ class MethodChannelMulticamera extends MulticameraPlatform {
         final id = arguments['id'] as int;
         final width = arguments['width'] as int;
         final height = arguments['height'] as int;
-        final quarterTurns = arguments['quarterTurns'] as int;
 
         Camera.setSize(id, (width, height));
-        Camera.setQuarterTurns(id, quarterTurns);
       case "recognitionResults":
         final id = arguments['id'] as int;
         final text = arguments['text'] as List?;
