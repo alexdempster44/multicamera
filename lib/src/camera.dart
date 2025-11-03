@@ -38,19 +38,19 @@ class Camera extends ChangeNotifier {
   }
 
   TextRecognizedCallback? get onTextRecognized => _onTextRecognized;
-  set onTextRecognized(TextRecognizedCallback value) {
+  set onTextRecognized(TextRecognizedCallback? value) {
     _onTextRecognized = value;
     _updateCamera();
   }
 
   BarcodesScannedCallback? get onBarcodesScanned => _onBarcodesScanned;
-  set onBarcodesScanned(BarcodesScannedCallback value) {
+  set onBarcodesScanned(BarcodesScannedCallback? value) {
     _onBarcodesScanned = value;
     _updateCamera();
   }
 
   FaceDetectedCallback? get onFaceDetected => _onFaceDetected;
-  set onFaceDetected(FaceDetectedCallback value) {
+  set onFaceDetected(FaceDetectedCallback? value) {
     _onFaceDetected = value;
     _updateCamera();
   }
