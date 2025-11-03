@@ -2,8 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:multicamera/camera.dart';
-import 'package:multicamera/camera_preview.dart';
+import 'package:multicamera/multicamera.dart';
 import 'package:multicamera_example/permissions.dart';
 
 class CameraView extends StatefulWidget {

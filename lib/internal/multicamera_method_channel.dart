@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:multicamera/camera.dart';
 import 'package:multicamera/internal/utilities.dart';
+import 'package:multicamera/src/camera.dart';
 
 import 'multicamera_platform_interface.dart';
 

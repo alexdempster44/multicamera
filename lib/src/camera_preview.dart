@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:multicamera/camera.dart';
+import 'package:multicamera/src/camera.dart';
 
 class CameraPreview extends StatefulWidget {
   final Camera camera;
