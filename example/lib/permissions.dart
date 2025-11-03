@@ -11,7 +11,11 @@ final class Permissions {
     _lock = completer.future;
 
     var cameraStatus = await Permission.camera.status;
-    if (cameraStatus.isGranted) return true;
+    if (cameraStatus.isGranted) {
+      completer.complete(true);
+      _lock = null;
+      return true;
+    }
 
     cameraStatus = await Permission.camera.request();
     final success = cameraStatus.isGranted;

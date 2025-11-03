@@ -42,23 +42,23 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
     }
 
     fun ensureSurface(size: Size): Surface {
-        val surfaceTexture = surfaceTexture ?: {
-            val surfaceTexture = SurfaceTexture(egl.texture)
+        val surfaceTexture = surfaceTexture ?: run {
+            val surfaceTexture = SurfaceTexture(this.egl.texture)
             surfaceTexture.setOnFrameAvailableListener {
-                handler.post { drawFrame() }
+                this.handler.post { this.drawFrame() }
             }
 
             this.surfaceTexture = surfaceTexture
             surfaceTexture
-        }()
+        }
         surfaceTexture.setDefaultBufferSize(size.width, size.height)
 
-        return surface ?: {
+        return surface ?: run {
             val surface = Surface(surfaceTexture)
 
             this.surface = surface
             surface
-        }()
+        }
     }
 
     fun refreshSurfaces(surfaces: List<Surface>) {
@@ -76,11 +76,12 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
 
     private fun updateTargets() {
         val added = surfaces - targets.keys
+        val removed = targets.keys - surfaces.toSet()
+
         for (surface in added) {
             targets[surface] = egl.createSurface(surface)
         }
 
-        val removed = targets.keys - surfaces
         for (surface in removed) {
             targets.remove(surface)?.also { egl.destroySurface(it) }
         }
@@ -207,8 +208,8 @@ class EGL : Closeable {
 
     fun createSurface(surface: Surface): EGLSurface {
         val attributes = intArrayOf(EGL14.EGL_NONE)
-
-        return EGL14.eglCreateWindowSurface(display, config, surface, attributes, 0)
+        val eglSurface = EGL14.eglCreateWindowSurface(display, config, surface, attributes, 0)
+        return eglSurface
     }
 
     fun bindSurface(surface: EGLSurface) {
@@ -227,12 +228,12 @@ class EGL : Closeable {
         GLES20.glClearColor(1.0F, 0.0F, 1.0F, 1.0F)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
-        val program = program ?: {
+        val program = program ?: run {
             val program = Program()
-            this.program = program
 
+            this.program = program
             program
-        }()
+        }
         program.draw(texture, textureMatrix)
 
         EGL14.eglSwapBuffers(display, surface)
@@ -307,10 +308,10 @@ private class Program : Closeable {
         val vertexShaderSource = """
             attribute vec2 aPosition;
             attribute vec2 aTexture;
-            
+
             uniform mat4 uTextureMatrix;
             varying vec2 vTexture;
-            
+
             void main(){
                 gl_Position = vec4(aPosition, 0.0, 1.0);
                 vec4 texture = uTextureMatrix * vec4(aTexture, 0.0, 1.0);
@@ -321,11 +322,11 @@ private class Program : Closeable {
         val fragmentShaderSource = """
             #extension GL_OES_EGL_image_external : require
             precision mediump float;
-            
+
             varying vec2 vTexture;
-            
+
             uniform samplerExternalOES uTexture;
-            
+
             void main(){
                 gl_FragColor = texture2D(uTexture, vTexture);
             }

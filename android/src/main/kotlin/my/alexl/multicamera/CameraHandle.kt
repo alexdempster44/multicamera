@@ -35,6 +35,8 @@ class CameraHandle(
                 it.setSize(size.width, size.height)
                 it.surface
             }
+
+            setupSession()
         }
     var size = Size(1, 1)
         private set
@@ -42,14 +44,14 @@ class CameraHandle(
         private set
 
     private var previewFanOut = PreviewFanOut(direction)
-    private lateinit var thread: HandlerThread
-    private lateinit var handler: Handler
+    private val thread = HandlerThread("my.alexl.multicamera.${direction.name}").apply { start() }
+    private val handler = Handler(thread.looper)
     private var device: CameraDevice? = null
     private var characteristics: CameraCharacteristics? = null
     private var pendingCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
-    private var imageReader: ImageReader? = null
+    private var captureImageReader: ImageReader? = null
     private var recognitionImageReader: ImageReader? = null
-    private var lastRecognitionTime: Long = 0
+    private var session: CameraCaptureSession? = null
     private var recognitionBusy = false
 
     private val cameraManager: CameraManager by lazy {
@@ -57,7 +59,6 @@ class CameraHandle(
     }
 
     init {
-        openThread()
         handler.post @RequiresPermission(Manifest.permission.CAMERA) { openDevice() }
     }
 
@@ -70,32 +71,49 @@ class CameraHandle(
 
     fun captureImage(callback: (ByteArray?) -> Unit) {
         pendingCaptureCallbacks.add(callback)
+        handler.post { setupSessionRequest(capture = true) }
+    }
+
+    private fun setupSession() {
+        val sessionRequired = surfaceProducers.isNotEmpty() || pendingCaptureCallbacks.isNotEmpty()
+        val hasSession = session != null
+        if (sessionRequired == hasSession) return
+
+        if (sessionRequired) {
+            createSession()
+        } else {
+            closeSession()
+        }
     }
 
     private fun createSession() {
+        if (session != null) return
         val device = device ?: return
 
         val previewSurface = previewFanOut.ensureSurface(size)
 
-        val imageReader = ImageReader.newInstance(
+        val captureImageReader = ImageReader.newInstance(
             size.width,
             size.height,
-            ImageFormat.YUV_420_888,
+            ImageFormat.JPEG,
             2
         )
-        imageReader.setOnImageAvailableListener({ reader ->
+        captureImageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
 
             val callbacks = pendingCaptureCallbacks.toList()
             pendingCaptureCallbacks.clear()
             if (callbacks.isNotEmpty()) {
-                val data = image.toJpeg(quarterTurns)
-                for (callback in callbacks) callback(data)
+                val buffer = image.planes[0].buffer
+                val bytes = ByteArray(buffer.remaining())
+                buffer.get(bytes)
+
+                for (callback in callbacks) callback(bytes)
             }
 
             image.close()
         }, handler)
-        this.imageReader = imageReader
+        this.captureImageReader = captureImageReader
 
         val recognitionImageReader = ImageReader.newInstance(
             (size.width * 0.2).toInt(),
@@ -104,15 +122,19 @@ class CameraHandle(
             2
         )
         recognitionImageReader.setOnImageAvailableListener({ reader ->
-            if (recognitionBusy) return@setOnImageAvailableListener
-            val now = System.currentTimeMillis()
-            if (now - lastRecognitionTime < 200) return@setOnImageAvailableListener
-
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
 
-            lastRecognitionTime = now
+            if (recognitionBusy) {
+                image.close()
+                return@setOnImageAvailableListener
+            }
+
             recognitionBusy = true
-            onRecognitionImage(image) { recognitionBusy = false }
+            onRecognitionImage(image) {
+                handler.postDelayed({
+                    recognitionBusy = false
+                }, 200)
+            }
         }, handler)
         this.recognitionImageReader = recognitionImageReader
 
@@ -120,22 +142,15 @@ class CameraHandle(
             SessionConfiguration.SESSION_REGULAR,
             listOf(
                 OutputConfiguration(previewSurface),
-                OutputConfiguration(imageReader.surface),
+                OutputConfiguration(captureImageReader.surface),
                 OutputConfiguration(recognitionImageReader.surface)
             ),
             { handler.post(it) },
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(captureSession: CameraCaptureSession) {
                     try {
-                        val request = device
-                            .createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-                            .apply {
-                                addTarget(previewSurface)
-                                addTarget(imageReader.surface)
-                                addTarget(recognitionImageReader.surface)
-                            }
-
-                        captureSession.setRepeatingRequest(request.build(), null, null)
+                        session = captureSession
+                        setupSessionRequest()
                     } catch (_: IllegalStateException) {
                         // Session closed
                     }
@@ -145,11 +160,6 @@ class CameraHandle(
             }
         )
         device.createCaptureSession(sessionConfiguration)
-    }
-
-    private fun openThread() {
-        thread = HandlerThread("my.alexl.multicamera.${direction.name}").apply { start() }
-        handler = Handler(thread.looper)
     }
 
     @RequiresPermission(Manifest.permission.CAMERA)
@@ -210,18 +220,51 @@ class CameraHandle(
         previewFanOut.quarterTurns = quarterTurns
     }
 
-    private fun closeDevice() {
-        imageReader?.close()
-        imageReader = null
+    private fun setupSessionRequest(capture: Boolean = false) {
+        val device = device ?: return
+        val session = session ?: return
+
+        val previewSurface = previewFanOut.ensureSurface(size)
+        val captureImageReader = captureImageReader ?: return
+        val recognitionImageReader = recognitionImageReader ?: return
+
+        val request = device
+            .createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+            .apply {
+                addTarget(previewSurface)
+                if (capture) addTarget(captureImageReader.surface)
+                addTarget(recognitionImageReader.surface)
+            }
+
+        try {
+            if (capture) {
+                session.capture(request.build(), null, null)
+            } else {
+                session.setRepeatingRequest(request.build(), null, null)
+            }
+        } catch (_: IllegalStateException) {
+            // Session closed
+        }
+    }
+
+    private fun closeSession() {
+        session?.apply { close() }
+        session = null
+        captureImageReader?.close()
+        captureImageReader = null
         recognitionImageReader?.close()
         recognitionImageReader = null
+    }
+
+    private fun closeDevice() {
+        closeSession()
         device?.close()
         device = null
     }
 
     override fun onOpened(camera: CameraDevice) {
         device = camera
-        createSession()
+        setupSession()
     }
 
     override fun onDisconnected(camera: CameraDevice) {

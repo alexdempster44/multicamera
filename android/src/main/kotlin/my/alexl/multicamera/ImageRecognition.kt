@@ -49,7 +49,6 @@ object ImageRecognition {
                 checkComplete()
             }
         }
-
         if (scanBarcodes) {
             barcodeScanner.process(inputImage).addOnSuccessListener { result ->
                 barcodes = result.mapNotNull { it.rawValue }
@@ -59,7 +58,6 @@ object ImageRecognition {
                 checkComplete()
             }
         }
-
         if (detectFaces) {
             faceDetector.process(inputImage).addOnSuccessListener { result ->
                 face = result.isNotEmpty()
@@ -69,6 +67,8 @@ object ImageRecognition {
                 checkComplete()
             }
         }
+
+        checkComplete()
     }
 
     data class Results(

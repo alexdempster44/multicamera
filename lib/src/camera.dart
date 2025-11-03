@@ -13,6 +13,7 @@ class Camera extends ChangeNotifier {
 
   Future<void>? _initializeLock;
   bool _initialized = false;
+  bool _pendingUpdate = false;
 
   int? _id;
   CameraDirection _direction;
@@ -28,31 +29,31 @@ class Camera extends ChangeNotifier {
   CameraDirection get direction => _direction;
   set direction(CameraDirection value) {
     _direction = value;
-    _updateCamera();
+    unawaited(_updateCamera());
   }
 
   bool get paused => _paused;
   set paused(bool value) {
     _paused = value;
-    _updateCamera();
+    unawaited(_updateCamera());
   }
 
   TextRecognizedCallback? get onTextRecognized => _onTextRecognized;
   set onTextRecognized(TextRecognizedCallback? value) {
     _onTextRecognized = value;
-    _updateCamera();
+    unawaited(_updateCamera());
   }
 
   BarcodesScannedCallback? get onBarcodesScanned => _onBarcodesScanned;
   set onBarcodesScanned(BarcodesScannedCallback? value) {
     _onBarcodesScanned = value;
-    _updateCamera();
+    unawaited(_updateCamera());
   }
 
   FaceDetectedCallback? get onFaceDetected => _onFaceDetected;
   set onFaceDetected(FaceDetectedCallback? value) {
     _onFaceDetected = value;
-    _updateCamera();
+    unawaited(_updateCamera());
   }
 
   (int, int) get size => _size;
@@ -131,13 +132,19 @@ class Camera extends ChangeNotifier {
     throw StateError('Not initialized');
   }
 
-  void _updateCamera() {
+  Future<void> _updateCamera() async {
     notifyListeners();
 
-    if (_initializeLock != null) throw StateError('Still initializing');
+    if (!initialized || _pendingUpdate) return;
+    _pendingUpdate = true;
+
+    if (_initializeLock case final future?) await future;
 
     final id = _id;
-    if (id == null) return;
+    if (id == null) {
+      _pendingUpdate = false;
+      return;
+    }
 
     MulticameraPlatform.instance.updateCamera(
       id,
@@ -147,6 +154,7 @@ class Camera extends ChangeNotifier {
       _onBarcodesScanned != null,
       _onFaceDetected != null,
     );
+    _pendingUpdate = false;
   }
 
   @override

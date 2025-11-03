@@ -12,6 +12,7 @@ class CameraHandle: AVCaptureVideoDataOutput {
     private static let session = AVCaptureMultiCamSession()
     private static let sessionLock = NSLock()
     private static var referenceCount = 0
+    private var hasSession = false
 
     private let output = AVCaptureVideoDataOutput()
     private let queue: DispatchQueue
@@ -42,46 +43,39 @@ class CameraHandle: AVCaptureVideoDataOutput {
             object: nil
         )
 
-        Task {
-            do {
-                try initialize()
-            } catch (_) {}
-        }
+        setupSession()
     }
 
     deinit {
+        closeSession()
+
         NotificationCenter.default.removeObserver(self)
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
+    }
 
-        Self.sessionLock.lock()
-        defer { Self.sessionLock.unlock() }
+    func setCameras(_ cameras: [Camera]) {
+        self.cameras = cameras
+        setupSession()
+    }
 
-        Self.session.beginConfiguration()
-        Self.session.removeOutput(output)
+    func captureImage(_ callback: @escaping (Data?) -> Void) {
+        pendingCaptureCallbacks.append(callback)
+        setupSession()
+    }
 
-        for input in Self.session.inputs {
-            guard let deviceInput = input as? AVCaptureDeviceInput else {
-                continue
-            }
+    private func setupSession() {
+        let sessionRequired =
+            !cameras.isEmpty || !pendingCaptureCallbacks.isEmpty
+        if sessionRequired == hasSession { return }
 
-            let position: AVCaptureDevice.Position =
-                switch direction {
-                case .front: .front
-                case .back: .back
-                }
-            if deviceInput.device.position != position { continue }
-
-            Self.session.removeInput(deviceInput)
-        }
-        Self.session.commitConfiguration()
-
-        Self.referenceCount -= 1
-        if Self.referenceCount == 0 {
-            Self.session.stopRunning()
+        if sessionRequired {
+            Task { createSession() }
+        } else {
+            Task { closeSession() }
         }
     }
 
-    private func initialize() throws {
+    private func createSession() {
         Self.sessionLock.lock()
         defer { Self.sessionLock.unlock() }
 
@@ -92,7 +86,13 @@ class CameraHandle: AVCaptureVideoDataOutput {
             return
         }
 
-        let input = try AVCaptureDeviceInput(device: device)
+        let input: AVCaptureDeviceInput
+        do {
+            input = try AVCaptureDeviceInput(device: device)
+        } catch (_) {
+            Self.session.commitConfiguration()
+            return
+        }
         guard Self.session.canAddInput(input) else {
             Self.session.commitConfiguration()
             return
@@ -117,15 +117,8 @@ class CameraHandle: AVCaptureVideoDataOutput {
         let dimensions = device.activeFormat.formatDescription.dimensions
         size = (dimensions.width, dimensions.height)
 
+        hasSession = true
         handleOrientationChange()
-    }
-
-    func setCameras(_ cameras: [Camera]) {
-        self.cameras = cameras
-    }
-
-    func captureImage(_ callback: @escaping (Data?) -> Void) {
-        pendingCaptureCallbacks.append(callback)
     }
 
     private func selectDevice() -> AVCaptureDevice? {
@@ -254,6 +247,37 @@ class CameraHandle: AVCaptureVideoDataOutput {
             self.quarterTurns = (quarterTurns + adjustment) % 4
             self.onCameraUpdated()
         }
+    }
+
+    private func closeSession() {
+        Self.sessionLock.lock()
+        defer { Self.sessionLock.unlock() }
+
+        Self.session.beginConfiguration()
+        Self.session.removeOutput(output)
+
+        for input in Self.session.inputs {
+            guard let deviceInput = input as? AVCaptureDeviceInput else {
+                continue
+            }
+
+            let position: AVCaptureDevice.Position =
+                switch direction {
+                case .front: .front
+                case .back: .back
+                }
+            if deviceInput.device.position != position { continue }
+
+            Self.session.removeInput(deviceInput)
+        }
+        Self.session.commitConfiguration()
+
+        Self.referenceCount -= 1
+        if Self.referenceCount == 0 {
+            Self.session.stopRunning()
+        }
+
+        hasSession = false
     }
 }
 
