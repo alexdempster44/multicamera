@@ -32,11 +32,11 @@ class CameraHandle(
         set(value) {
             field = value
             previewFanOut.surfaces = value.map {
-                size?.apply { it.setSize(width, height) }
+                it.setSize(size.width, size.height)
                 it.surface
             }
         }
-    var size: Size? = null
+    var size = Size(1, 1)
         private set
     var quarterTurns = 0
         private set
@@ -74,7 +74,6 @@ class CameraHandle(
 
     private fun createSession() {
         val device = device ?: return
-        val size = size ?: return
 
         val previewSurface = previewFanOut.ensureSurface(size)
 
@@ -85,8 +84,7 @@ class CameraHandle(
             2
         )
         imageReader.setOnImageAvailableListener({ reader ->
-            val image = reader.acquireLatestImage()
-            if (image == null) return@setOnImageAvailableListener
+            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
 
             val callbacks = pendingCaptureCallbacks.toList()
             pendingCaptureCallbacks.clear()
@@ -110,8 +108,7 @@ class CameraHandle(
             val now = System.currentTimeMillis()
             if (now - lastRecognitionTime < 200) return@setOnImageAvailableListener
 
-            val image = reader.acquireLatestImage()
-            if (image == null) return@setOnImageAvailableListener
+            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
 
             lastRecognitionTime = now
             recognitionBusy = true

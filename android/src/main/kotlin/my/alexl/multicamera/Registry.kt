@@ -104,15 +104,14 @@ class Registry(val plugin: MulticameraPlugin) {
 
     private fun updateFlutterCameras(direction: Camera.Direction) {
         val handle = cameraHandles[direction] ?: return
-        val size = handle.size ?: return
+        val cameras = cameras.values.filter { it.direction == direction && !it.paused }
 
-        var width = size.width
-        var height = size.height
+        var width = handle.size.width
+        var height = handle.size.height
         if (handle.quarterTurns % 2 == 1) {
             width = height.also { height = width }
         }
 
-        val cameras = cameras.values.filter { it.direction == direction }
         for (camera in cameras) {
             Handler(Looper.getMainLooper()).post {
                 plugin.channel.invokeMethod(

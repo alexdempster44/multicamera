@@ -104,7 +104,9 @@ class Registry {
 
     private func updateFlutterCameras(_ direction: Camera.Direction) {
         guard let handle = cameraHandles[direction] else { return }
-        let cameras = cameras.values.filter { $0.direction == direction }
+        let cameras = cameras.values.filter {
+            $0.direction == direction && !$0.paused
+        }
 
         var width = handle.size.0
         var height = handle.size.1
