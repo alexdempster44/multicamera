@@ -3,13 +3,14 @@ version: 1.0.0
 publish_to: 'none'
 
 environment:
-  flutter: "3.35.6"
+  flutter: "3.35.7"
   sdk: ">=3.9.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
 
+  permission_handler: ^12.0.1
   multicamera:
     path: ../
 

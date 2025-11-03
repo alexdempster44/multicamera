@@ -67,7 +67,7 @@ packages:
     source: path
     version: "1.0.0"
   permission_handler:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: permission_handler
       sha256: bc917da36261b00137bbc8896bf1482169cd76f866282368948f032c8c1caae1
@@ -145,4 +145,4 @@ packages:
     version: "1.1.1"
 sdks:
   dart: ">=3.9.0 <4.0.0"
-  flutter: "3.35.6"
+  flutter: "3.35.7"

@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
 import 'package:multicamera/internal/multicamera_platform_interface.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 typedef TextRecognizedCallback = void Function(List<String>);
 typedef BarcodesScannedCallback = void Function(List<String>);
@@ -99,12 +98,6 @@ class Camera extends ChangeNotifier {
     final completer = Completer<void>();
     _initializeLock = completer.future;
 
-    if (!await _ensurePermissions()) {
-      completer.complete();
-      _initializeLock = null;
-      return;
-    }
-
     final id = await MulticameraPlatform.instance.registerCamera(
       _direction,
       _paused,
@@ -129,14 +122,6 @@ class Camera extends ChangeNotifier {
     if (id == null) return null;
 
     return await MulticameraPlatform.instance.captureImage(id);
-  }
-
-  Future<bool> _ensurePermissions() async {
-    var cameraStatus = await Permission.camera.status;
-    if (cameraStatus.isGranted) return true;
-
-    cameraStatus = await Permission.camera.request();
-    return cameraStatus.isGranted;
   }
 
   Future<void> _ensureInitialized() async {

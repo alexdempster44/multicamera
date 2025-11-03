@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:multicamera/camera.dart';
 import 'package:multicamera/camera_preview.dart';
+import 'package:multicamera_example/permissions.dart';
 
 class CameraView extends StatefulWidget {
   final void Function(Uint8List) onCapture;
@@ -31,6 +33,13 @@ class _CameraViewState extends State<CameraView> {
     camera.onTextRecognized = (value) => setState(() => text = value);
     camera.onBarcodesScanned = (value) => setState(() => barcodes = value);
     camera.onFaceDetected = (value) => setState(() => face = value);
+
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize() async {
+    final hasPermissions = await Permissions.ensure();
+    if (!hasPermissions) return;
 
     camera.initialize();
   }
