@@ -1,3 +1,7 @@
+## v1.2.1
+
+* (Android) Fix immediate capture not returning image
+
 ## v1.2.0
 
 * Stop camera session when paused to turn off system camera indicator

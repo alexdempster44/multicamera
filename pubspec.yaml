@@ -1,6 +1,6 @@
 name: multicamera
 description: Multiplexed cameras
-version: 1.2.0
+version: 1.2.1
 homepage: https://github.com/alexdempster44/multicamera
 
 environment:
