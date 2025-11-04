@@ -1,3 +1,8 @@
+## v1.3.0
+
+* (Dart) Add dartdocs to public API
+* Improve code readability
+
 ## v1.2.1
 
 * (Android) Fix immediate capture not returning image
