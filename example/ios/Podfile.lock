@@ -56,7 +56,7 @@ PODS:
     - GTMSessionFetcher/Core (< 4.0, >= 3.3.2)
     - MLImage (= 1.0.0-beta8)
     - MLKitCommon (~> 14.0)
-  - multicamera (1.1.0):
+  - multicamera (1.2.0):
     - Flutter
     - GoogleMLKit/BarcodeScanning (~> 9.0.0)
     - GoogleMLKit/FaceDetection (~> 9.0.0)
@@ -114,7 +114,7 @@ SPEC CHECKSUMS:
   MLKitTextRecognition: c0ad24510481dfc8893ad15dfcb8a5f05ed9e826
   MLKitTextRecognitionCommon: 234ceb1cfdfb5fceb4fd664943046609a2961cc2
   MLKitVision: 39a5a812db83c4a0794445088e567f3631c11961
-  multicamera: 88b7528a3a9126b0dff758db12f3258db57b4119
+  multicamera: a22adb827628dc39f0a0d5d9dce1b840f99afec0
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
