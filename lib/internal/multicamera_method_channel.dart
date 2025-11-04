@@ -13,7 +13,12 @@ class MethodChannelMulticamera extends MulticameraPlatform {
     methodChannel.setMethodCallHandler((call) async {
       try {
         return await _handleMethodCall(call);
-      } catch (_) {}
+      } catch (e, stackTrace) {
+        debugPrint(
+          '[Multicamera] Error handling method call ${call.method}: $e'
+          ', stack trace: $stackTrace',
+        );
+      }
     });
   }
 

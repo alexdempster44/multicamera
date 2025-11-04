@@ -14,6 +14,10 @@ class CameraHandle: AVCaptureVideoDataOutput {
     private static var referenceCount = 0
     private var hasSession = false
 
+    private static let captureCompressionQuality: CGFloat = 0.8
+    private static let recognitionThrottleInterval: TimeInterval = 0.2
+    private static let recognitionImageScale: CGFloat = 0.2
+
     private let output = AVCaptureVideoDataOutput()
     private let queue: DispatchQueue
     private let ciContext = CIContext()
@@ -152,7 +156,9 @@ class CameraHandle: AVCaptureVideoDataOutput {
 
         if !pendingCaptureCallbacks.isEmpty {
             if let image = convertDataToImage(data) {
-                let imageData = image.jpegData(compressionQuality: 80)
+                let imageData = image.jpegData(
+                    compressionQuality: CameraHandle.captureCompressionQuality
+                )
                 for callback in pendingCaptureCallbacks {
                     Task { callback(imageData) }
                 }
@@ -161,11 +167,15 @@ class CameraHandle: AVCaptureVideoDataOutput {
         }
 
         let now = Date()
-        let elapsed =
-            lastRecognitionTime?.timeIntervalSince(now) ?? Double.infinity
+        let elapsed = now.timeIntervalSince(
+            lastRecognitionTime ?? Date.distantPast
+        )
 
-        if abs(elapsed) < 0.2 { return }
-        if let image = convertDataToImage(data, scale: 0.2) {
+        if elapsed < Self.recognitionThrottleInterval { return }
+        if let image = convertDataToImage(
+            data,
+            scale: Self.recognitionImageScale
+        ) {
             self.lastRecognitionTime = now
             Task { onRecognitionImage(image) }
         }

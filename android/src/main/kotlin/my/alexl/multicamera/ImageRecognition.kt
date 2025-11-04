@@ -21,9 +21,9 @@ object ImageRecognition {
         detectFaces: Boolean,
         onResults: (Results) -> Unit
     ) {
-        var recognizeText = recognizeText
-        var scanBarcodes = scanBarcodes
-        var detectFaces = detectFaces
+        var textRecognitionRequired = recognizeText
+        var barcodeScanningRequired = scanBarcodes
+        var faceDetectionRequired = detectFaces
 
         val inputImage = InputImage.fromMediaImage(image, 0)
 
@@ -32,38 +32,38 @@ object ImageRecognition {
         var face: Boolean? = null
 
         fun checkComplete() {
-            if (recognizeText && text == null) return
-            if (scanBarcodes && barcodes == null) return
-            if (detectFaces && face == null) return
+            if (textRecognitionRequired && text == null) return
+            if (barcodeScanningRequired && barcodes == null) return
+            if (faceDetectionRequired && face == null) return
 
             image.close()
             onResults(Results(text, barcodes, face))
         }
 
-        if (recognizeText) {
+        if (textRecognitionRequired) {
             textRecognizer.process(inputImage).addOnSuccessListener { result ->
                 text = result.textBlocks.map { it.text }
                 checkComplete()
             }.addOnFailureListener {
-                recognizeText = false
+                textRecognitionRequired = false
                 checkComplete()
             }
         }
-        if (scanBarcodes) {
+        if (barcodeScanningRequired) {
             barcodeScanner.process(inputImage).addOnSuccessListener { result ->
                 barcodes = result.mapNotNull { it.rawValue }
                 checkComplete()
             }.addOnFailureListener {
-                scanBarcodes = false
+                barcodeScanningRequired = false
                 checkComplete()
             }
         }
-        if (detectFaces) {
+        if (faceDetectionRequired) {
             faceDetector.process(inputImage).addOnSuccessListener { result ->
                 face = result.isNotEmpty()
                 checkComplete()
             }.addOnFailureListener {
-                detectFaces = false
+                faceDetectionRequired = false
                 checkComplete()
             }
         }

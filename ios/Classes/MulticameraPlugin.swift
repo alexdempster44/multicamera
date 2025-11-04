@@ -29,34 +29,83 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
         _ call: FlutterMethodCall,
         result: @escaping FlutterResult
     ) {
-        let arguments = call.arguments as! [String: Any]
+        guard let arguments = call.arguments as? [String: Any] else {
+            result(
+                FlutterError(
+                    code: "INVALID_ARGUMENTS",
+                    message: "Expected arguments as [String: Any]",
+                    details: nil
+                )
+            )
+            return
+        }
 
         switch call.method {
         case "registerCamera":
-            let rawDirection = arguments["direction"] as! Int32
+            guard let rawDirection = arguments["direction"] as? Int32,
+                let direction = Camera.Direction(rawValue: rawDirection),
+                let paused = arguments["paused"] as? Bool,
+                let recognizeText = arguments["recognizeText"] as? Bool,
+                let scanBarcodes = arguments["scanBarcodes"] as? Bool,
+                let detectFaces = arguments["detectFaces"] as? Bool
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARGUMENTS",
+                        message: "Invalid arguments for registerCamera",
+                        details: nil
+                    )
+                )
+                return
+            }
             let id = registry.registerCamera(
-                direction: Camera.Direction(rawValue: rawDirection)!,
-                paused: arguments["paused"] as! Bool,
-                recognizeText: arguments["recognizeText"] as! Bool,
-                scanBarcodes: arguments["scanBarcodes"] as! Bool,
-                detectFaces: arguments["detectFaces"] as! Bool
+                direction: direction,
+                paused: paused,
+                recognizeText: recognizeText,
+                scanBarcodes: scanBarcodes,
+                detectFaces: detectFaces
             )
             result(NSNumber(value: id))
 
         case "updateCamera":
-            let rawDirection = arguments["direction"] as! Int32
+            guard let id = arguments["id"] as? Int64,
+                let rawDirection = arguments["direction"] as? Int32,
+                let direction = Camera.Direction(rawValue: rawDirection),
+                let paused = arguments["paused"] as? Bool,
+                let recognizeText = arguments["recognizeText"] as? Bool,
+                let scanBarcodes = arguments["scanBarcodes"] as? Bool,
+                let detectFaces = arguments["detectFaces"] as? Bool
+            else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARGUMENTS",
+                        message: "Invalid arguments for updateCamera",
+                        details: nil
+                    )
+                )
+                return
+            }
             registry.updateCamera(
-                id: arguments["id"] as! Int64,
-                direction: Camera.Direction(rawValue: rawDirection)!,
-                paused: arguments["paused"] as! Bool,
-                recognizeText: arguments["recognizeText"] as! Bool,
-                scanBarcodes: arguments["scanBarcodes"] as! Bool,
-                detectFaces: arguments["detectFaces"] as! Bool
+                id: id,
+                direction: direction,
+                paused: paused,
+                recognizeText: recognizeText,
+                scanBarcodes: scanBarcodes,
+                detectFaces: detectFaces
             )
             result(nil)
 
         case "captureImage":
-            let id = arguments["id"] as! Int64
+            guard let id = arguments["id"] as? Int64 else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARGUMENTS",
+                        message: "Invalid arguments for captureImage",
+                        details: nil
+                    )
+                )
+                return
+            }
             registry.captureImage(
                 id: id,
                 { image in
@@ -69,7 +118,17 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
             )
 
         case "unregisterCamera":
-            registry.unregisterCamera(id: arguments["id"] as! Int64)
+            guard let id = arguments["id"] as? Int64 else {
+                result(
+                    FlutterError(
+                        code: "INVALID_ARGUMENTS",
+                        message: "Invalid arguments for unregisterCamera",
+                        details: nil
+                    )
+                )
+                return
+            }
+            registry.unregisterCamera(id: id)
             result(nil)
 
         default:

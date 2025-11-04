@@ -248,6 +248,8 @@ class CameraHandle(
     }
 
     private fun closeSession() {
+        for (callback in pendingCaptureCallbacks) callback(null)
+        pendingCaptureCallbacks.clear()
         session?.apply { close() }
         session = null
         captureImageReader?.close()

@@ -1,5 +1,5 @@
 name: multicamera
-description: Multiplexed cameras
+description: A Flutter plugin for managing multiple camera instances simultaneously with built-in ML kit support.
 version: 1.2.1
 homepage: https://github.com/alexdempster44/multicamera
 
@@ -10,6 +10,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  meta: ^1.16.0
   plugin_platform_interface: ^2.1.8
 
 dev_dependencies:
