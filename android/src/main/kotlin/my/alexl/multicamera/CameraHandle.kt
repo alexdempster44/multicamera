@@ -150,7 +150,7 @@ class CameraHandle(
                 override fun onConfigured(captureSession: CameraCaptureSession) {
                     try {
                         session = captureSession
-                        setupSessionRequest()
+                        setupSessionRequest(capture = pendingCaptureCallbacks.isNotEmpty())
                     } catch (_: IllegalStateException) {
                         // Session closed
                     }
