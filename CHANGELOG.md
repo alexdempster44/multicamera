@@ -1,3 +1,7 @@
+## v1.3.1
+
+* (iOS) Lower minimum platform version to 15.5
+
 ## v1.3.0
 
 * (Dart) Add dartdocs to public API
