@@ -1,3 +1,7 @@
+## v1.3.2
+
+* (Android) Adjust image acquire technique to avoid warnings
+
 ## v1.3.1+1
 
 * Adjust file structure to hide internal dart files
