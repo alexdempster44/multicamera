@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:multicamera/internal/utilities.dart';
-import 'package:multicamera/src/camera.dart';
 
+import '../camera.dart';
 import 'multicamera_platform_interface.dart';
+import 'utilities.dart';
 
 class MethodChannelMulticamera extends MulticameraPlatform {
   @visibleForTesting

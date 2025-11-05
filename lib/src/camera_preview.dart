@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:multicamera/src/camera.dart';
+
+import 'camera.dart';
 
 /// A widget that displays a live camera preview.
 ///

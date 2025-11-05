@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'package:multicamera/src/camera.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import '../camera.dart';
 import 'multicamera_method_channel.dart';
 
 abstract class MulticameraPlatform extends PlatformInterface {

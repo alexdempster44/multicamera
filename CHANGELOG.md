@@ -1,3 +1,7 @@
+## v1.3.1+1
+
+* Adjust file structure to hide internal dart files
+
 ## v1.3.1
 
 * (iOS) Lower minimum platform version to 15.5

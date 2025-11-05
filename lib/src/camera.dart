@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:multicamera/internal/multicamera_platform_interface.dart';
+
+import 'internal/multicamera_platform_interface.dart';
 
 /// Callback function that is invoked when text is recognized in the camera
 /// feed.
