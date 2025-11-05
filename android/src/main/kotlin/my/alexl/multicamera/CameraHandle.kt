@@ -99,7 +99,7 @@ class CameraHandle(
             2
         )
         captureImageReader.setOnImageAvailableListener({ reader ->
-            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+            val image = reader.acquireNextImage() ?: return@setOnImageAvailableListener
 
             val callbacks = pendingCaptureCallbacks.toList()
             pendingCaptureCallbacks.clear()
@@ -122,7 +122,7 @@ class CameraHandle(
             2
         )
         recognitionImageReader.setOnImageAvailableListener({ reader ->
-            val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+            val image = reader.acquireNextImage() ?: return@setOnImageAvailableListener
 
             if (recognitionBusy) {
                 image.close()
@@ -132,6 +132,7 @@ class CameraHandle(
             recognitionBusy = true
             onRecognitionImage(image) {
                 handler.postDelayed({
+                    image.close()
                     recognitionBusy = false
                 }, 200)
             }

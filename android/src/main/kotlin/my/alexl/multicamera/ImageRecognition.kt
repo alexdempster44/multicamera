@@ -36,7 +36,6 @@ object ImageRecognition {
             if (barcodeScanningRequired && barcodes == null) return
             if (faceDetectionRequired && face == null) return
 
-            image.close()
             onResults(Results(text, barcodes, face))
         }
 
