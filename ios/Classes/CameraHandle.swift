@@ -15,11 +15,12 @@ class CameraHandle: NSObject {
         qos: .userInitiated
     )
     private static var referenceCount = 0
-    private var hasSession = false
+    private var device: AVCaptureDevice?
 
     private static let captureCompressionQuality: CGFloat = 0.8
     private static let recognitionThrottleInterval: TimeInterval = 0.2
     private static let recognitionImageScale: CGFloat = 0.2
+    private static let stableExposureOffset: Float = 0.5
 
     private let output = AVCaptureVideoDataOutput()
     private let queue: DispatchQueue
@@ -50,7 +51,7 @@ class CameraHandle: NSObject {
             object: nil
         )
 
-        setupSession()
+        createDevice()
     }
 
     deinit {
@@ -59,7 +60,7 @@ class CameraHandle: NSObject {
         }
         pendingCaptureCallbacks = []
 
-        closeSession()
+        closeDevice()
 
         NotificationCenter.default.removeObserver(self)
         UIDevice.current.endGeneratingDeviceOrientationNotifications()
@@ -67,28 +68,30 @@ class CameraHandle: NSObject {
 
     func setCameras(_ cameras: [Camera]) {
         self.cameras = cameras
-        setupSession()
+        setupDevice()
     }
 
     func captureImage(_ callback: @escaping (Data?) -> Void) {
         pendingCaptureCallbacks.append(callback)
-        setupSession()
+        setupDevice()
     }
 
-    private func setupSession() {
-        let sessionRequired =
+    private func setupDevice() {
+        let hasDevice = device != nil
+        let deviceRequired =
             !cameras.isEmpty || !pendingCaptureCallbacks.isEmpty
-        if sessionRequired == hasSession { return }
 
-        if sessionRequired {
-            Self.sessionQueue.async { [weak self] in self?.createSession() }
+        if hasDevice == deviceRequired { return }
+
+        if deviceRequired {
+            Self.sessionQueue.async { [weak self] in self?.createDevice() }
         } else {
-            Self.sessionQueue.async { [weak self] in self?.closeSession() }
+            Self.sessionQueue.async { [weak self] in self?.closeDevice() }
         }
     }
 
-    private func createSession() {
-        if hasSession { return }
+    private func createDevice() {
+        if device != nil { return }
 
         Self.session.beginConfiguration()
 
@@ -96,6 +99,7 @@ class CameraHandle: NSObject {
             Self.session.commitConfiguration()
             return
         }
+        self.device = device
 
         let input: AVCaptureDeviceInput
         do {
@@ -128,7 +132,6 @@ class CameraHandle: NSObject {
         let dimensions = device.activeFormat.formatDescription.dimensions
         size = (dimensions.width, dimensions.height)
 
-        hasSession = true
         handleOrientationChange()
     }
 
@@ -161,16 +164,17 @@ class CameraHandle: NSObject {
             camera.updateFrame(data)
         }
 
-        if !pendingCaptureCallbacks.isEmpty {
-            if let image = convertDataToImage(data) {
-                let imageData = image.jpegData(
-                    compressionQuality: CameraHandle.captureCompressionQuality
-                )
-                for callback in pendingCaptureCallbacks {
-                    Task { callback(imageData) }
-                }
-                pendingCaptureCallbacks = []
+        if !pendingCaptureCallbacks.isEmpty && exposureStable(),
+            let image = convertDataToImage(data)
+        {
+            let imageData = image.jpegData(
+                compressionQuality: CameraHandle.captureCompressionQuality
+            )
+            for callback in pendingCaptureCallbacks {
+                Task { callback(imageData) }
             }
+            pendingCaptureCallbacks = []
+
         }
 
         let now = Date()
@@ -239,6 +243,12 @@ class CameraHandle: NSObject {
         return UIImage(cgImage: cg, scale: 1.0, orientation: .up)
     }
 
+    private func exposureStable() -> Bool {
+        guard let device = device else { return false }
+        return !device.isAdjustingExposure
+            && abs(device.exposureTargetOffset) < Self.stableExposureOffset
+    }
+
     @objc private func handleOrientationChange() {
         DispatchQueue.main.async { [self] in
             let windowScene =
@@ -266,8 +276,9 @@ class CameraHandle: NSObject {
         }
     }
 
-    private func closeSession() {
-        if !hasSession { return }
+    private func closeDevice() {
+        guard let device = device else { return }
+        self.device = nil
 
         Self.session.beginConfiguration()
         Self.session.removeOutput(output)
@@ -276,13 +287,7 @@ class CameraHandle: NSObject {
             guard let deviceInput = input as? AVCaptureDeviceInput else {
                 continue
             }
-
-            let position: AVCaptureDevice.Position =
-                switch direction {
-                case .front: .front
-                case .back: .back
-                }
-            if deviceInput.device.position != position { continue }
+            if deviceInput.device != device { continue }
 
             Self.session.removeInput(deviceInput)
         }
@@ -292,8 +297,6 @@ class CameraHandle: NSObject {
         if Self.referenceCount == 0 {
             Self.session.stopRunning()
         }
-
-        hasSession = false
     }
 }
 
