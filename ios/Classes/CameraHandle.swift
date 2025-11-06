@@ -2,7 +2,7 @@ import AVFoundation
 import Flutter
 import UIKit
 
-class CameraHandle: AVCaptureVideoDataOutput {
+class CameraHandle: NSObject {
     let direction: Camera.Direction
     let onCameraUpdated: (() -> Void)
     let onRecognitionImage: ((UIImage) -> Void)
@@ -10,7 +10,10 @@ class CameraHandle: AVCaptureVideoDataOutput {
     private(set) var quarterTurns: Int32 = 1
 
     private static let session = AVCaptureMultiCamSession()
-    private static let sessionLock = NSLock()
+    private static let sessionQueue = DispatchQueue(
+        label: "my.alexl.multicamera.session",
+        qos: .userInitiated
+    )
     private static var referenceCount = 0
     private var hasSession = false
 
@@ -51,6 +54,11 @@ class CameraHandle: AVCaptureVideoDataOutput {
     }
 
     deinit {
+        for callback in pendingCaptureCallbacks {
+            callback(nil)
+        }
+        pendingCaptureCallbacks = []
+
         closeSession()
 
         NotificationCenter.default.removeObserver(self)
@@ -73,15 +81,14 @@ class CameraHandle: AVCaptureVideoDataOutput {
         if sessionRequired == hasSession { return }
 
         if sessionRequired {
-            Task { createSession() }
+            Self.sessionQueue.async { [weak self] in self?.createSession() }
         } else {
-            Task { closeSession() }
+            Self.sessionQueue.async { [weak self] in self?.closeSession() }
         }
     }
 
     private func createSession() {
-        Self.sessionLock.lock()
-        defer { Self.sessionLock.unlock() }
+        if hasSession { return }
 
         Self.session.beginConfiguration()
 
@@ -260,8 +267,7 @@ class CameraHandle: AVCaptureVideoDataOutput {
     }
 
     private func closeSession() {
-        Self.sessionLock.lock()
-        defer { Self.sessionLock.unlock() }
+        if !hasSession { return }
 
         Self.session.beginConfiguration()
         Self.session.removeOutput(output)

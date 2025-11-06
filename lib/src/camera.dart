@@ -240,7 +240,7 @@ class Camera extends ChangeNotifier {
     if (_initializeLock case final future?) await future;
     if (_id case final id?) {
       _instances.remove(id);
-      MulticameraPlatform.instance.unregisterCamera(id);
+      await MulticameraPlatform.instance.unregisterCamera(id);
     }
 
     super.dispose();

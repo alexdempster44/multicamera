@@ -27,7 +27,7 @@ class Registry {
         )
 
         cameras[camera.id] = camera
-        Task { reconcile() }
+        reconcile()
 
         return camera.id
     }
@@ -48,7 +48,7 @@ class Registry {
         camera.scanBarcodes = scanBarcodes
         camera.detectFaces = detectFaces
 
-        Task { reconcile() }
+        reconcile()
     }
 
     func captureImage(id: Int64, _ callback: @escaping (Data?) -> Void) {
@@ -66,7 +66,7 @@ class Registry {
 
     func unregisterCamera(id: Int64) {
         cameras.removeValue(forKey: id)
-        Task { reconcile() }
+        reconcile()
     }
 
     private func reconcile() {
