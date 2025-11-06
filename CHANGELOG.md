@@ -1,3 +1,8 @@
+## v1.3.3
+
+* (iOS) Adjust session management to prevent dangling devices
+* (iOS) Wait for exposure to stabilize before capturing images
+
 ## v1.3.2
 
 * (Android) Adjust image acquire technique to avoid warnings
