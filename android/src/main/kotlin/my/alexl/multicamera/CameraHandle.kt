@@ -165,23 +165,27 @@ class CameraHandle(
 
     @RequiresPermission(Manifest.permission.CAMERA)
     private fun openDevice() {
-        val lensFacing = when (direction) {
-            Camera.Direction.Front -> CameraCharacteristics.LENS_FACING_FRONT
-            Camera.Direction.Back -> CameraCharacteristics.LENS_FACING_BACK
+        try {
+            val lensFacing = when (direction) {
+                Camera.Direction.Front -> CameraCharacteristics.LENS_FACING_FRONT
+                Camera.Direction.Back -> CameraCharacteristics.LENS_FACING_BACK
+            }
+
+            val cameraIds = cameraManager.cameraIdList
+            val cameraId = cameraIds.firstOrNull {
+                val chars = cameraManager.getCameraCharacteristics(it)
+                chars.get(CameraCharacteristics.LENS_FACING) == lensFacing
+            } ?: cameraIds.first()
+
+            characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            calculateSize()
+            calculateQuarterTurns()
+            onStateChanged()
+
+            cameraManager.openCamera(cameraId, this, null)
+        } catch (_: Exception) {
+            closeDevice()
         }
-
-        val cameraIds = cameraManager.cameraIdList
-        val cameraId = cameraIds.firstOrNull {
-            val chars = cameraManager.getCameraCharacteristics(it)
-            chars.get(CameraCharacteristics.LENS_FACING) == lensFacing
-        } ?: cameraIds.first()
-
-        characteristics = cameraManager.getCameraCharacteristics(cameraId)
-        calculateSize()
-        calculateQuarterTurns()
-        onStateChanged()
-
-        cameraManager.openCamera(cameraId, this, null)
     }
 
     private fun calculateSize() {
