@@ -1,3 +1,7 @@
+## v1.3.4
+
+* (Android) Handle exceptions when opening camera handle device
+
 ## v1.3.3
 
 * (iOS) Adjust session management to prevent dangling devices
