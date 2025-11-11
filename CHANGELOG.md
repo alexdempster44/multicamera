@@ -1,3 +1,7 @@
+## v1.3.5
+
+* (iOS) Fallback if multicamera sessions are not supported
+
 ## v1.3.4
 
 * (Android) Handle exceptions when opening camera handle device
