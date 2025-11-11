@@ -72,17 +72,20 @@ class Registry {
     private func reconcile() {
         for direction in Camera.Direction.allCases {
             let cameras = cameras.values.filter { $0.direction == direction }
-            let handleRequired = !cameras.isEmpty
+            guard cameras.isEmpty else { continue }
 
-            if handleRequired {
-                let handle =
-                    cameraHandles[direction]
-                    ?? createHandle(direction: direction)
+            cameraHandles.removeValue(forKey: direction)?.close()
+        }
 
-                handle.setCameras(cameras.filter { !$0.paused })
-            } else {
-                cameraHandles.removeValue(forKey: direction)
-            }
+        for direction in Camera.Direction.allCases {
+            let cameras = cameras.values.filter { $0.direction == direction }
+            guard !cameras.isEmpty else { continue }
+
+            (cameraHandles[direction] ?? createHandle(direction: direction))
+                .setCameras(cameras.filter { !$0.paused })
+        }
+
+        for direction in Camera.Direction.allCases {
             self.updateFlutterCameras(direction)
         }
     }

@@ -9,7 +9,12 @@ class CameraHandle: NSObject {
     private(set) var size: (Int32, Int32) = (1, 1)
     private(set) var quarterTurns: Int32 = 1
 
-    private static let session = AVCaptureMultiCamSession()
+    private static let session: AVCaptureSession = {
+        if AVCaptureMultiCamSession.isMultiCamSupported {
+            return AVCaptureMultiCamSession()
+        }
+        return AVCaptureSession()
+    }()
     private static let sessionQueue = DispatchQueue(
         label: "my.alexl.multicamera.session",
         qos: .userInitiated
@@ -51,19 +56,18 @@ class CameraHandle: NSObject {
             object: nil
         )
 
-        createDevice()
+        Self.sessionQueue.async { [self] in self.createDevice() }
     }
 
-    deinit {
+    func close() {
         for callback in pendingCaptureCallbacks {
             callback(nil)
         }
         pendingCaptureCallbacks = []
 
-        closeDevice()
+        Self.sessionQueue.async { [self] in self.closeDevice() }
 
         NotificationCenter.default.removeObserver(self)
-        UIDevice.current.endGeneratingDeviceOrientationNotifications()
     }
 
     func setCameras(_ cameras: [Camera]) {
@@ -77,16 +81,13 @@ class CameraHandle: NSObject {
     }
 
     private func setupDevice() {
-        let hasDevice = device != nil
-        let deviceRequired =
-            !cameras.isEmpty || !pendingCaptureCallbacks.isEmpty
-
-        if hasDevice == deviceRequired { return }
-
-        if deviceRequired {
-            Self.sessionQueue.async { [weak self] in self?.createDevice() }
-        } else {
-            Self.sessionQueue.async { [weak self] in self?.closeDevice() }
+        Self.sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            if !cameras.isEmpty || !pendingCaptureCallbacks.isEmpty {
+                self.createDevice()
+            } else {
+                self.closeDevice()
+            }
         }
     }
 
@@ -99,12 +100,11 @@ class CameraHandle: NSObject {
             Self.session.commitConfiguration()
             return
         }
-        self.device = device
 
         let input: AVCaptureDeviceInput
         do {
             input = try AVCaptureDeviceInput(device: device)
-        } catch (_) {
+        } catch {
             Self.session.commitConfiguration()
             return
         }
@@ -124,6 +124,7 @@ class CameraHandle: NSObject {
 
         Self.session.commitConfiguration()
 
+        self.device = device
         Self.referenceCount += 1
         if Self.referenceCount == 1 {
             Self.session.startRunning()
@@ -278,7 +279,6 @@ class CameraHandle: NSObject {
 
     private func closeDevice() {
         guard let device = device else { return }
-        self.device = nil
 
         Self.session.beginConfiguration()
         Self.session.removeOutput(output)
@@ -293,6 +293,7 @@ class CameraHandle: NSObject {
         }
         Self.session.commitConfiguration()
 
+        self.device = nil
         Self.referenceCount -= 1
         if Self.referenceCount == 0 {
             Self.session.stopRunning()
