@@ -12,8 +12,6 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
-import android.hardware.camera2.params.OutputConfiguration
-import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
@@ -170,14 +168,13 @@ class CameraHandle(
         }, handler)
         this.recognitionImageReader = recognitionImageReader
 
-        val sessionConfiguration = SessionConfiguration(
-            SessionConfiguration.SESSION_REGULAR,
+        @Suppress("DEPRECATION")
+        device.createCaptureSession(
             listOf(
-                OutputConfiguration(previewSurface),
-                OutputConfiguration(captureImageReader.surface),
-                OutputConfiguration(recognitionImageReader.surface)
+                previewSurface,
+                captureImageReader.surface,
+                recognitionImageReader.surface
             ),
-            { handler.post(it) },
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(captureSession: CameraCaptureSession) {
                     session = captureSession
@@ -185,9 +182,9 @@ class CameraHandle(
                 }
 
                 override fun onConfigureFailed(session: CameraCaptureSession) {}
-            }
+            },
+            handler
         )
-        device.createCaptureSession(sessionConfiguration)
     }
 
     @RequiresPermission(Manifest.permission.CAMERA)
