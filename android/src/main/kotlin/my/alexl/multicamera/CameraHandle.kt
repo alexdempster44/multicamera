@@ -18,8 +18,12 @@ import android.os.HandlerThread
 import android.util.Size
 import android.view.Surface
 import androidx.annotation.RequiresPermission
+import androidx.exifinterface.media.ExifInterface
 import io.flutter.view.TextureRegistry
 import java.io.Closeable
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 
 @SuppressLint("MissingPermission")
 class CameraHandle(
@@ -108,7 +112,8 @@ class CameraHandle(
                 val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
 
-                for (callback in callbacks) callback(bytes)
+                val bytesWithExif = addExifOrientation(bytes)
+                for (callback in callbacks) callback(bytesWithExif)
             }
 
             image.close()
@@ -223,6 +228,27 @@ class CameraHandle(
 
         quarterTurns = rotation / 90
         previewFanOut.quarterTurns = quarterTurns
+    }
+
+    private fun addExifOrientation(bytes: ByteArray): ByteArray {
+        val file = File.createTempFile("capture", ".jpg", plugin.context.cacheDir)
+        try {
+            FileOutputStream(file).use { it.write(bytes) }
+
+            val exif = ExifInterface(file.absolutePath)
+            val exifOrientation = when (quarterTurns % 4) {
+                1 -> ExifInterface.ORIENTATION_ROTATE_90
+                2 -> ExifInterface.ORIENTATION_ROTATE_180
+                3 -> ExifInterface.ORIENTATION_ROTATE_270
+                else -> ExifInterface.ORIENTATION_NORMAL
+            }
+            exif.setAttribute(ExifInterface.TAG_ORIENTATION, exifOrientation.toString())
+            exif.saveAttributes()
+
+            return FileInputStream(file).use { it.readBytes() }
+        } finally {
+            file.delete()
+        }
     }
 
     private fun setupSessionRequest(capture: Boolean = false) {
