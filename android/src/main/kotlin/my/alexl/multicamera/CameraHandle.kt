@@ -9,6 +9,9 @@ import android.hardware.camera2.CameraCaptureSession
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraDevice
 import android.hardware.camera2.CameraManager
+import android.hardware.camera2.CaptureRequest
+import android.hardware.camera2.CaptureResult
+import android.hardware.camera2.TotalCaptureResult
 import android.hardware.camera2.params.OutputConfiguration
 import android.hardware.camera2.params.SessionConfiguration
 import android.media.Image
@@ -56,7 +59,29 @@ class CameraHandle(
     private var captureImageReader: ImageReader? = null
     private var recognitionImageReader: ImageReader? = null
     private var session: CameraCaptureSession? = null
+    private var captureBusy = false
     private var recognitionBusy = false
+
+    private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
+        override fun onCaptureCompleted(
+            session: CameraCaptureSession,
+            request: CaptureRequest,
+            result: TotalCaptureResult
+        ) {
+            val exposureLevelled = listOf(
+                CaptureResult.CONTROL_AE_STATE_CONVERGED,
+                CaptureResult.CONTROL_AE_STATE_LOCKED
+            ).contains(result.get(CaptureResult.CONTROL_AE_STATE))
+
+            if (!captureBusy &&
+                pendingCaptureCallbacks.isNotEmpty() &&
+                exposureLevelled
+            ) {
+                captureBusy = true
+                setupSessionRequest(capture = true)
+            }
+        }
+    }
 
     private val cameraManager: CameraManager by lazy {
         plugin.context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
@@ -74,8 +99,7 @@ class CameraHandle(
     }
 
     fun captureImage(callback: (ByteArray?) -> Unit) {
-        pendingCaptureCallbacks.add(callback)
-        handler.post { setupSessionRequest(capture = true) }
+        handler.post { pendingCaptureCallbacks.add(callback) }
     }
 
     private fun setupSession() {
@@ -117,6 +141,8 @@ class CameraHandle(
             }
 
             image.close()
+            captureBusy = false
+            setupSessionRequest()
         }, handler)
         this.captureImageReader = captureImageReader
 
@@ -154,12 +180,8 @@ class CameraHandle(
             { handler.post(it) },
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(captureSession: CameraCaptureSession) {
-                    try {
-                        session = captureSession
-                        setupSessionRequest(capture = pendingCaptureCallbacks.isNotEmpty())
-                    } catch (_: IllegalStateException) {
-                        // Session closed
-                    }
+                    session = captureSession
+                    setupSessionRequest()
                 }
 
                 override fun onConfigureFailed(session: CameraCaptureSession) {}
@@ -269,9 +291,9 @@ class CameraHandle(
 
         try {
             if (capture) {
-                session.capture(request.build(), null, null)
+                session.capture(request.build(), captureCallback, null)
             } else {
-                session.setRepeatingRequest(request.build(), null, null)
+                session.setRepeatingRequest(request.build(), captureCallback, null)
             }
         } catch (_: IllegalStateException) {
             // Session closed
