@@ -60,6 +60,8 @@ class CameraHandle: NSObject {
     }
 
     func close() {
+        output.setSampleBufferDelegate(nil, queue: nil)
+        cameras = []
         for callback in pendingCaptureCallbacks {
             callback(nil)
         }
