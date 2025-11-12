@@ -1,3 +1,9 @@
+## v1.3.6
+
+* (Android) Wait for exposure to level before capturing
+* (Android) Add EXIF rotation data to captures
+* (iOS) Close camera handle outputs immediately
+
 ## v1.3.5
 
 * (iOS) Fallback if multicamera sessions are not supported
