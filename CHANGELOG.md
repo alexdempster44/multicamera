@@ -1,3 +1,7 @@
+## v1.3.7
+
+* (Android) Lower `minSdk` to 21
+
 ## v1.3.6
 
 * (Android) Wait for exposure to level before capturing
