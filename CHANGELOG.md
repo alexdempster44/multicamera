@@ -1,3 +1,7 @@
+## v1.3.8
+
+* (iOS) Prevent disposing already disposed flutter textures from backgrounding
+
 ## v1.3.7
 
 * (Android) Lower `minSdk` to 21
