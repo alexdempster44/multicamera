@@ -65,7 +65,7 @@ class Registry {
     }
 
     func unregisterCamera(id: Int64) {
-        cameras.removeValue(forKey: id)
+        cameras.removeValue(forKey: id)?.close()
         reconcile()
     }
 

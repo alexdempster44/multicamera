@@ -32,7 +32,7 @@ class Camera: NSObject, FlutterTexture {
         id = plugin.textures.register(self)
     }
 
-    deinit {
+    func close() {
         plugin.textures.unregisterTexture(id)
     }
 
