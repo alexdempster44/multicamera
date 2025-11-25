@@ -17,6 +17,7 @@ import android.view.Surface
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.CountDownLatch
 import kotlin.properties.Delegates
 
 class PreviewFanOut(val direction: Camera.Direction) : Closeable {
@@ -38,7 +39,12 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
     private val textureMatrix = FloatArray(16)
 
     init {
-        handler.post { egl = EGL() }
+        val latch = CountDownLatch(1)
+        handler.post {
+            egl = EGL()
+            latch.countDown()
+        }
+        latch.await()
     }
 
     fun ensureSurface(size: Size): Surface {
@@ -207,7 +213,7 @@ class EGL : Closeable {
     }
 
     fun createSurface(surface: Surface): EGLSurface {
-        val attributes = intArrayOf(EGL14.EGL_NONE)
+            val attributes = intArrayOf(EGL14.EGL_NONE)
         val eglSurface = EGL14.eglCreateWindowSurface(display, config, surface, attributes, 0)
         return eglSurface
     }
