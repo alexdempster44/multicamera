@@ -75,7 +75,9 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
             targets.clear()
 
             for (surface in surfaces) {
-                targets[surface] = egl.createSurface(surface)
+                egl.createSurface(surface)?.let {
+                    targets[surface] = it
+                }
             }
         }
     }
@@ -85,7 +87,9 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
         val removed = targets.keys - surfaces.toSet()
 
         for (surface in added) {
-            targets[surface] = egl.createSurface(surface)
+            egl.createSurface(surface)?.let {
+                targets[surface] = it
+            }
         }
 
         for (surface in removed) {
@@ -212,10 +216,18 @@ class EGL : Closeable {
         texture = id[0]
     }
 
-    fun createSurface(surface: Surface): EGLSurface {
+    fun createSurface(surface: Surface): EGLSurface? {
+        if (!surface.isValid) {
+            return null
+        }
+
+        return try {
             val attributes = intArrayOf(EGL14.EGL_NONE)
-        val eglSurface = EGL14.eglCreateWindowSurface(display, config, surface, attributes, 0)
-        return eglSurface
+            EGL14.eglCreateWindowSurface(display, config, surface, attributes, 0)
+        } catch (_: IllegalArgumentException) {
+            // Surface became invalid during creation
+            null
+        }
     }
 
     fun bindSurface(surface: EGLSurface) {
