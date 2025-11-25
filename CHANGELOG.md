@@ -1,3 +1,8 @@
+## v1.3.9
+
+* (Android) Initialize EGL synchronously to prevent race conditions on slower devices
+* (Android) Handle errors when creating EGL surfaces
+
 ## v1.3.8
 
 * (iOS) Prevent disposing already disposed flutter textures from backgrounding
