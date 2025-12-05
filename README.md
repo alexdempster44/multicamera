@@ -18,7 +18,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  multicamera: ^1.3.9
+  multicamera: ^1.3.10
 ```
 
 Or install from the repository:

@@ -1,3 +1,7 @@
+## v1.3.10
+
+* (Android) Catch and ignore exceptions when running image recognition
+
 ## v1.3.9
 
 * (Android) Initialize EGL synchronously to prevent race conditions on slower devices
