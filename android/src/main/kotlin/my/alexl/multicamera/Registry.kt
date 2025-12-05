@@ -137,28 +137,32 @@ class Registry(val plugin: MulticameraPlugin) {
         val scanBarcodes = cameras.any { it.scanBarcodes }
         val detectFaces = cameras.any { it.detectFaces }
 
-        ImageRecognition.recognizeImage(
-            image,
-            recognizeText,
-            scanBarcodes,
-            detectFaces
-        ) { results ->
-            val cameras = this.cameras.values.filter { it.direction == direction && !it.paused }
-            for (camera in cameras) {
-                Handler(Looper.getMainLooper()).post {
-                    plugin.channel.invokeMethod(
-                        "recognitionResults",
-                        mapOf(
-                            "id" to camera.id,
-                            "text" to results.text,
-                            "barcodes" to results.barcodes,
-                            "face" to results.face
+        try {
+            ImageRecognition.recognizeImage(
+                image,
+                recognizeText,
+                scanBarcodes,
+                detectFaces
+            ) { results ->
+                val cameras = this.cameras.values.filter { it.direction == direction && !it.paused }
+                for (camera in cameras) {
+                    Handler(Looper.getMainLooper()).post {
+                        plugin.channel.invokeMethod(
+                            "recognitionResults",
+                            mapOf(
+                                "id" to camera.id,
+                                "text" to results.text,
+                                "barcodes" to results.barcodes,
+                                "face" to results.face
+                            )
                         )
-                    )
+                    }
                 }
-            }
 
-            onComplete()
+                onComplete()
+            }
+        } catch (_: IllegalStateException) {
+            // Ignore
         }
     }
 }
