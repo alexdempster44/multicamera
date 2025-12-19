@@ -32,6 +32,7 @@ class CameraHandle: NSObject {
     private let ciContext = CIContext()
     private var cameras: [Camera] = []
     private var pendingCaptureCallbacks: [(Data?) -> Void] = []
+    private var immediate = false
     private var lastRecognitionTime: Date?
 
     init(
@@ -77,7 +78,10 @@ class CameraHandle: NSObject {
         setupDevice()
     }
 
-    func captureImage(_ callback: @escaping (Data?) -> Void) {
+    func captureImage(immediate: Bool = false, _ callback: @escaping (Data?) -> Void) {
+        if immediate {
+            self.immediate = true
+        }
         pendingCaptureCallbacks.append(callback)
         setupDevice()
     }
@@ -167,7 +171,7 @@ class CameraHandle: NSObject {
             camera.updateFrame(data)
         }
 
-        if !pendingCaptureCallbacks.isEmpty && exposureStable(),
+        if !pendingCaptureCallbacks.isEmpty && (exposureStable() || immediate),
             let image = convertDataToImage(data)
         {
             let imageData = image.jpegData(
@@ -177,7 +181,7 @@ class CameraHandle: NSObject {
                 Task { callback(imageData) }
             }
             pendingCaptureCallbacks = []
-
+            immediate = false
         }
 
         let now = Date()

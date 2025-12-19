@@ -36,7 +36,7 @@ abstract class MulticameraPlatform extends PlatformInterface {
     bool detectFaces,
   ) => throw UnimplementedError();
 
-  Future<Uint8List?> captureImage(int id) => throw UnimplementedError();
+  Future<Uint8List?> captureImage(int id, bool immediate) => throw UnimplementedError();
 
   Future<void> unregisterCamera(int id) => throw UnimplementedError();
 }

@@ -59,6 +59,7 @@ class CameraHandle(
     private var session: CameraCaptureSession? = null
     private var captureBusy = false
     private var recognitionBusy = false
+    private var immediate = false
 
     private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
         override fun onCaptureCompleted(
@@ -73,9 +74,10 @@ class CameraHandle(
 
             if (!captureBusy &&
                 pendingCaptureCallbacks.isNotEmpty() &&
-                exposureLevelled
+                (exposureLevelled || immediate)
             ) {
                 captureBusy = true
+                immediate = false
                 setupSessionRequest(capture = true)
             }
         }
@@ -96,8 +98,13 @@ class CameraHandle(
         }
     }
 
-    fun captureImage(callback: (ByteArray?) -> Unit) {
-        handler.post { pendingCaptureCallbacks.add(callback) }
+    fun captureImage(immediate: Boolean = false, callback: (ByteArray?) -> Unit) {
+        handler.post {
+            if (immediate) {
+                this.immediate = true
+            }
+            pendingCaptureCallbacks.add(callback)
+        }
     }
 
     private fun setupSession() {
