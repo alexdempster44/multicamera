@@ -104,10 +104,18 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
         surfaceTexture.updateTexImage()
         surfaceTexture.getTransformMatrix(textureMatrix)
 
-        val quarterTurns = when (direction) {
-            Camera.Direction.Front -> -quarterTurns + 1
-            Camera.Direction.Back -> quarterTurns + 1
+        var quarterTurns = this.quarterTurns
+        quarterTurns *= when (direction) {
+            Camera.Direction.Front -> -1
+            Camera.Direction.Back -> 1
         }
+        quarterTurns -= when {
+            textureMatrix[0] > 0.5f -> 0
+            textureMatrix[1] > 0.5f -> 1
+            textureMatrix[0] < -0.5f -> 2
+            else -> 3
+        }
+
         Matrix.translateM(textureMatrix, 0, 0.5F, 0.5F, 0F)
         Matrix.rotateM(textureMatrix, 0, quarterTurns * 90.0F, 0F, 0F, 1F)
         if (direction == Camera.Direction.Back) Matrix.scaleM(textureMatrix, 0, -1.0F, 1.0F, 0.0F)
