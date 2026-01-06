@@ -1,3 +1,9 @@
+## v1.3.11 (pending)
+
+* (Android) Correct matrix calculation for previews
+* (Android) Increase minimum API level to 26
+* (Android) Update dependencies
+
 ## v1.3.10
 
 * (Android) Catch and ignore exceptions when running image recognition
