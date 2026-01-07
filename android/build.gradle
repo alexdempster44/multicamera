@@ -9,7 +9,7 @@ buildscript {
     }
 
     dependencies {
-        classpath("com.android.tools.build:gradle:8.9.1")
+        classpath("com.android.tools.build:gradle:8.9.3")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
     }
 }
@@ -44,12 +44,12 @@ android {
     }
 
     defaultConfig {
-        minSdk = 21
+        minSdk = 26
     }
 }
 
 dependencies {
-    implementation 'androidx.exifinterface:exifinterface:1.4.1'
+    implementation 'androidx.exifinterface:exifinterface:1.4.2'
     implementation 'com.google.mlkit:text-recognition:16.0.1'
     implementation 'com.google.mlkit:barcode-scanning:17.3.0'
     implementation 'com.google.mlkit:face-detection:16.1.7'
