@@ -69,7 +69,7 @@ class _CameraViewState extends State<CameraView> {
               IconButton.filled(
                 icon: Icon(Icons.camera),
                 onPressed: () async {
-                  final image = await camera.captureImage();
+                  final image = await camera.captureImage(immediate: false);
                   if (!mounted || image == null) return;
 
                   widget.onCapture(image);
