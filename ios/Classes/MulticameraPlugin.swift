@@ -106,7 +106,7 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
                 )
                 return
             }
-            let immediate = arguments["immediate"] as? Bool ?? false
+            let immediate = arguments["immediate"] as! Bool
             registry.captureImage(
                 id: id,
                 immediate: immediate,

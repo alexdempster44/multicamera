@@ -14,8 +14,10 @@ import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.media.Image
 import android.media.ImageReader
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
+import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.annotation.RequiresPermission
@@ -54,12 +56,12 @@ class CameraHandle(
     private var device: CameraDevice? = null
     private var characteristics: CameraCharacteristics? = null
     private var pendingCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
+    private var pendingImmediateCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
     private var captureImageReader: ImageReader? = null
     private var recognitionImageReader: ImageReader? = null
     private var session: CameraCaptureSession? = null
     private var captureBusy = false
     private var recognitionBusy = false
-    private var immediate = false
 
     private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
         override fun onCaptureCompleted(
@@ -72,12 +74,11 @@ class CameraHandle(
                 CaptureResult.CONTROL_AE_STATE_LOCKED
             ).contains(result.get(CaptureResult.CONTROL_AE_STATE))
 
-            if (!captureBusy &&
-                pendingCaptureCallbacks.isNotEmpty() &&
-                (exposureLevelled || immediate)
-            ) {
+            val hasImmediateCapture = pendingImmediateCaptureCallbacks.isNotEmpty()
+            val hasStableCapture = pendingCaptureCallbacks.isNotEmpty() && exposureLevelled
+
+            if (!captureBusy && (hasImmediateCapture || hasStableCapture)) {
                 captureBusy = true
-                immediate = false
                 setupSessionRequest(capture = true)
             }
         }
@@ -98,17 +99,20 @@ class CameraHandle(
         }
     }
 
-    fun captureImage(immediate: Boolean = false, callback: (ByteArray?) -> Unit) {
+    fun captureImage(immediate: Boolean, callback: (ByteArray?) -> Unit) {
         handler.post {
             if (immediate) {
-                this.immediate = true
+                pendingImmediateCaptureCallbacks.add(callback)
+            } else {
+                pendingCaptureCallbacks.add(callback)
             }
-            pendingCaptureCallbacks.add(callback)
         }
     }
 
     private fun setupSession() {
-        val sessionRequired = surfaceProducers.isNotEmpty() || pendingCaptureCallbacks.isNotEmpty()
+        val sessionRequired = surfaceProducers.isNotEmpty() ||
+            pendingCaptureCallbacks.isNotEmpty() ||
+            pendingImmediateCaptureCallbacks.isNotEmpty()
         val hasSession = session != null
         if (sessionRequired == hasSession) return
 
@@ -134,8 +138,12 @@ class CameraHandle(
         captureImageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireNextImage() ?: return@setOnImageAvailableListener
 
-            val callbacks = pendingCaptureCallbacks.toList()
+            val immediateCallbacks = pendingImmediateCaptureCallbacks.toList()
+            val stableCallbacks = pendingCaptureCallbacks.toList()
+            pendingImmediateCaptureCallbacks.clear()
             pendingCaptureCallbacks.clear()
+
+            val callbacks = immediateCallbacks + stableCallbacks
             if (callbacks.isNotEmpty()) {
                 val buffer = image.planes[0].buffer
                 val bytes = ByteArray(buffer.remaining())
@@ -236,8 +244,14 @@ class CameraHandle(
 
     private fun calculateQuarterTurns() {
         val characteristics = characteristics ?: return
-        val sensorOrientation =
+        val realSensorOrientation =
             characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: return
+
+        // TODO: SIMULATION - Remove after testing
+        // Zebra KC50 might have different sensor orientation (0, 90, 180?)
+        // Samsung typically has 270. Try different values to simulate Zebra bug.
+        val simulateZebra = false  // Set to true to simulate
+        val sensorOrientation = if (simulateZebra) 0 else realSensorOrientation
 
         val degrees = when (plugin.deviceOrientation) {
             Surface.ROTATION_0 -> 0
@@ -254,6 +268,10 @@ class CameraHandle(
 
         quarterTurns = rotation / 90
         previewFanOut.quarterTurns = quarterTurns
+
+        Log.d(TAG, "[calculateQuarterTurns] ${Build.MANUFACTURER} ${Build.MODEL}, " +
+            "direction=$direction, realSensor=$realSensorOrientation, usedSensor=$sensorOrientation, " +
+            "device=${plugin.deviceOrientation}, degrees=$degrees, rotation=$rotation, quarterTurns=$quarterTurns")
     }
 
     private fun addExifOrientation(bytes: ByteArray): ByteArray {
@@ -306,7 +324,9 @@ class CameraHandle(
 
     private fun closeSession() {
         for (callback in pendingCaptureCallbacks) callback(null)
+        for (callback in pendingImmediateCaptureCallbacks) callback(null)
         pendingCaptureCallbacks.clear()
+        pendingImmediateCaptureCallbacks.clear()
         session?.apply { close() }
         session = null
         captureImageReader?.close()
@@ -341,5 +361,9 @@ class CameraHandle(
         thread.quitSafely()
         thread.join()
         previewFanOut.close()
+    }
+
+    companion object {
+        private const val TAG = "MulticameraOrientation"
     }
 }

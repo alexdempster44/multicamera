@@ -182,15 +182,14 @@ class Camera extends ChangeNotifier {
   /// Returns the image data as a [Uint8List] containing the image bytes, or
   /// `null` if the capture fails.
   ///
-  /// If [immediate] is `true`, the image is captured immediately without
-  /// waiting for the exposure to stabilize. This is useful for fast capture
-  /// scenarios like face detection.
+  /// If [immediate] is `true`, the image is captured without waiting for a
+  /// stable exposure.
   ///
   /// The camera must be initialized before calling this method.
   /// If initialization is in progress, this method waits for it to complete.
   ///
   /// Throws [StateError] if the camera has not been initialized.
-  Future<Uint8List?> captureImage({bool immediate = false}) async {
+  Future<Uint8List?> captureImage({required bool immediate}) async {
     await _ensureInitialized();
 
     final id = _id;
