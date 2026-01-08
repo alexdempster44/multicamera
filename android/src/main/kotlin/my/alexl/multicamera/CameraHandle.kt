@@ -14,10 +14,8 @@ import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
 import android.media.Image
 import android.media.ImageReader
-import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
-import android.util.Log
 import android.util.Size
 import android.view.Surface
 import androidx.annotation.RequiresPermission
@@ -244,14 +242,8 @@ class CameraHandle(
 
     private fun calculateQuarterTurns() {
         val characteristics = characteristics ?: return
-        val realSensorOrientation =
+        val sensorOrientation =
             characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: return
-
-        // TODO: SIMULATION - Remove after testing
-        // Zebra KC50 might have different sensor orientation (0, 90, 180?)
-        // Samsung typically has 270. Try different values to simulate Zebra bug.
-        val simulateZebra = false  // Set to true to simulate
-        val sensorOrientation = if (simulateZebra) 0 else realSensorOrientation
 
         val degrees = when (plugin.deviceOrientation) {
             Surface.ROTATION_0 -> 0
@@ -268,10 +260,6 @@ class CameraHandle(
 
         quarterTurns = rotation / 90
         previewFanOut.quarterTurns = quarterTurns
-
-        Log.d(TAG, "[calculateQuarterTurns] ${Build.MANUFACTURER} ${Build.MODEL}, " +
-            "direction=$direction, realSensor=$realSensorOrientation, usedSensor=$sensorOrientation, " +
-            "device=${plugin.deviceOrientation}, degrees=$degrees, rotation=$rotation, quarterTurns=$quarterTurns")
     }
 
     private fun addExifOrientation(bytes: ByteArray): ByteArray {
@@ -361,9 +349,5 @@ class CameraHandle(
         thread.quitSafely()
         thread.join()
         previewFanOut.close()
-    }
-
-    companion object {
-        private const val TAG = "MulticameraOrientation"
     }
 }
