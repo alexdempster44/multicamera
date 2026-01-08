@@ -189,7 +189,7 @@ class Camera extends ChangeNotifier {
   /// If initialization is in progress, this method waits for it to complete.
   ///
   /// Throws [StateError] if the camera has not been initialized.
-  Future<Uint8List?> captureImage({required bool immediate}) async {
+  Future<Uint8List?> captureImage({bool immediate = false}) async {
     await _ensureInitialized();
 
     final id = _id;

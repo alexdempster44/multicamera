@@ -133,8 +133,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
 ```dart
 // Capture an image from the camera
-// immediate: true = capture immediately, false = wait for stable exposure
-Uint8List? imageData = await camera.captureImage(immediate: false);
+Uint8List? imageData = await camera.captureImage();
 
 if (imageData case final data?) {
   Image.memory(data); // Display the image

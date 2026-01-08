@@ -66,10 +66,10 @@ class CameraHandle: NSObject {
         for callback in pendingCaptureCallbacks {
             callback(nil)
         }
+        pendingCaptureCallbacks = []
         for callback in pendingImmediateCaptureCallbacks {
             callback(nil)
         }
-        pendingCaptureCallbacks = []
         pendingImmediateCaptureCallbacks = []
 
         Self.sessionQueue.async { [self] in self.closeDevice() }
@@ -94,9 +94,9 @@ class CameraHandle: NSObject {
     private func setupDevice() {
         Self.sessionQueue.async { [weak self] in
             guard let self = self else { return }
-            if !cameras.isEmpty ||
-               !pendingCaptureCallbacks.isEmpty ||
-               !pendingImmediateCaptureCallbacks.isEmpty {
+            if !cameras.isEmpty || !pendingCaptureCallbacks.isEmpty
+                || !pendingImmediateCaptureCallbacks.isEmpty
+            {
                 self.createDevice()
             } else {
                 self.closeDevice()
@@ -178,21 +178,28 @@ class CameraHandle: NSObject {
             camera.updateFrame(data)
         }
 
-        let hasImmediateCapture = !pendingImmediateCaptureCallbacks.isEmpty
-        let hasStableCapture = !pendingCaptureCallbacks.isEmpty && exposureStable()
+        let exposureStable = exposureStable()
 
-        if (hasImmediateCapture || hasStableCapture),
-            let image = convertDataToImage(data)
-        {
+        let hasStableCapture =
+            !pendingCaptureCallbacks.isEmpty && exposureStable
+        let hasImmediateCapture = !pendingImmediateCaptureCallbacks.isEmpty
+        let hasCapture = hasStableCapture || hasImmediateCapture
+
+        if hasCapture, let image = convertDataToImage(data) {
             let imageData = image.jpegData(
                 compressionQuality: CameraHandle.captureCompressionQuality
             )
-            let callbacks = pendingImmediateCaptureCallbacks + pendingCaptureCallbacks
+
+            var callbacks = pendingImmediateCaptureCallbacks
+            pendingImmediateCaptureCallbacks = []
+            if exposureStable {
+                callbacks += pendingCaptureCallbacks
+                pendingCaptureCallbacks = []
+            }
+
             for callback in callbacks {
                 Task { callback(imageData) }
             }
-            pendingImmediateCaptureCallbacks = []
-            pendingCaptureCallbacks = []
         }
 
         let now = Date()

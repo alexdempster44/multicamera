@@ -44,7 +44,7 @@ class _HomeState extends State<Home> {
                   onPressed: () async {
                     final camera = Camera(direction: CameraDirection.front);
                     await camera.initialize();
-                    final image = await camera.captureImage(immediate: false);
+                    final image = await camera.captureImage();
                     camera.dispose();
                     if (!mounted || image == null) return;
 
@@ -56,7 +56,7 @@ class _HomeState extends State<Home> {
                   onPressed: () async {
                     final camera = Camera(direction: CameraDirection.back);
                     await camera.initialize();
-                    final image = await camera.captureImage(immediate: false);
+                    final image = await camera.captureImage();
                     camera.dispose();
                     if (!mounted || image == null) return;
 
