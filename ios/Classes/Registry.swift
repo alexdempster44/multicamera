@@ -51,7 +51,11 @@ class Registry {
         reconcile()
     }
 
-    func captureImage(id: Int64, _ callback: @escaping (Data?) -> Void) {
+    func captureImage(
+        id: Int64,
+        immediate: Bool,
+        _ callback: @escaping (Data?) -> Void
+    ) {
         guard let camera = cameras[id] else {
             callback(nil)
             return
@@ -61,7 +65,7 @@ class Registry {
             return
         }
 
-        handle.captureImage(callback)
+        handle.captureImage(immediate: immediate, callback)
     }
 
     func unregisterCamera(id: Int64) {

@@ -52,7 +52,7 @@ class Registry(val plugin: MulticameraPlugin) {
         reconcile()
     }
 
-    fun captureImage(id: Long, callback: (ByteArray?) -> Unit) {
+    fun captureImage(id: Long, immediate: Boolean, callback: (ByteArray?) -> Unit) {
         val camera = cameras[id]
         if (camera == null) {
             callback(null)
@@ -65,7 +65,7 @@ class Registry(val plugin: MulticameraPlugin) {
             return
         }
 
-        handle.captureImage(callback)
+        handle.captureImage(immediate, callback)
     }
 
     fun onOrientationChanged() {

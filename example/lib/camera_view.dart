@@ -66,14 +66,28 @@ class _CameraViewState extends State<CameraView> {
                 ),
               ),
               const SizedBox(height: 8),
-              IconButton.filled(
-                icon: Icon(Icons.camera),
-                onPressed: () async {
-                  final image = await camera.captureImage();
-                  if (!mounted || image == null) return;
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton.filled(
+                    icon: Icon(Icons.camera),
+                    onPressed: () async {
+                      final image = await camera.captureImage();
+                      if (!mounted || image == null) return;
 
-                  widget.onCapture(image);
-                },
+                      widget.onCapture(image);
+                    },
+                  ),
+                  IconButton.outlined(
+                    icon: Icon(Icons.camera_outlined),
+                    onPressed: () async {
+                      final image = await camera.captureImage(immediate: true);
+                      if (!mounted || image == null) return;
+
+                      widget.onCapture(image);
+                    },
+                  ),
+                ],
               ),
               Text('Text: $text'),
               Text('Barcodes: $barcodes'),

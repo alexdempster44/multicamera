@@ -54,10 +54,12 @@ class CameraHandle(
     private var device: CameraDevice? = null
     private var characteristics: CameraCharacteristics? = null
     private var pendingCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
+    private var pendingImmediateCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
     private var captureImageReader: ImageReader? = null
     private var recognitionImageReader: ImageReader? = null
     private var session: CameraCaptureSession? = null
     private var captureBusy = false
+    private var exposureLevelled = false
     private var recognitionBusy = false
 
     private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
@@ -66,15 +68,16 @@ class CameraHandle(
             request: CaptureRequest,
             result: TotalCaptureResult
         ) {
-            val exposureLevelled = listOf(
+            exposureLevelled = listOf(
                 CaptureResult.CONTROL_AE_STATE_CONVERGED,
                 CaptureResult.CONTROL_AE_STATE_LOCKED
             ).contains(result.get(CaptureResult.CONTROL_AE_STATE))
 
-            if (!captureBusy &&
-                pendingCaptureCallbacks.isNotEmpty() &&
-                exposureLevelled
-            ) {
+            val hasStableCapture = pendingCaptureCallbacks.isNotEmpty() && exposureLevelled
+            val hasImmediateCapture = pendingImmediateCaptureCallbacks.isNotEmpty()
+            val hasCapture = hasStableCapture || hasImmediateCapture
+
+            if (!captureBusy && hasCapture) {
                 captureBusy = true
                 setupSessionRequest(capture = true)
             }
@@ -96,12 +99,20 @@ class CameraHandle(
         }
     }
 
-    fun captureImage(callback: (ByteArray?) -> Unit) {
-        handler.post { pendingCaptureCallbacks.add(callback) }
+    fun captureImage(immediate: Boolean, callback: (ByteArray?) -> Unit) {
+        handler.post {
+            if (immediate) {
+                pendingImmediateCaptureCallbacks.add(callback)
+            } else {
+                pendingCaptureCallbacks.add(callback)
+            }
+        }
     }
 
     private fun setupSession() {
-        val sessionRequired = surfaceProducers.isNotEmpty() || pendingCaptureCallbacks.isNotEmpty()
+        val sessionRequired = surfaceProducers.isNotEmpty() ||
+                pendingCaptureCallbacks.isNotEmpty() ||
+                pendingImmediateCaptureCallbacks.isNotEmpty()
         val hasSession = session != null
         if (sessionRequired == hasSession) return
 
@@ -127,8 +138,13 @@ class CameraHandle(
         captureImageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireNextImage() ?: return@setOnImageAvailableListener
 
-            val callbacks = pendingCaptureCallbacks.toList()
-            pendingCaptureCallbacks.clear()
+            val callbacks = pendingImmediateCaptureCallbacks.toMutableList()
+            pendingImmediateCaptureCallbacks.clear()
+            if (exposureLevelled) {
+                callbacks += pendingCaptureCallbacks
+                pendingCaptureCallbacks.clear()
+            }
+
             if (callbacks.isNotEmpty()) {
                 val buffer = image.planes[0].buffer
                 val bytes = ByteArray(buffer.remaining())
@@ -299,7 +315,9 @@ class CameraHandle(
 
     private fun closeSession() {
         for (callback in pendingCaptureCallbacks) callback(null)
+        for (callback in pendingImmediateCaptureCallbacks) callback(null)
         pendingCaptureCallbacks.clear()
+        pendingImmediateCaptureCallbacks.clear()
         session?.apply { close() }
         session = null
         captureImageReader?.close()

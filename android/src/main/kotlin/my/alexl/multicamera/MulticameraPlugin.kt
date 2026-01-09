@@ -61,7 +61,10 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             }
 
             "captureImage" -> {
-                registry.captureImage(call.argument<Long>("id")!!) {
+                registry.captureImage(
+                    call.argument<Long>("id")!!,
+                    call.argument<Boolean>("immediate")!!
+                ) {
                     result.success(it)
                 }
             }

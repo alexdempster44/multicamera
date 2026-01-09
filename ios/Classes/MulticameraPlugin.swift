@@ -96,7 +96,9 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
             result(nil)
 
         case "captureImage":
-            guard let id = arguments["id"] as? Int64 else {
+            guard let id = arguments["id"] as? Int64,
+                let immediate = arguments["immediate"] as? Bool
+            else {
                 result(
                     FlutterError(
                         code: "INVALID_ARGUMENTS",
@@ -108,6 +110,7 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
             }
             registry.captureImage(
                 id: id,
+                immediate: immediate,
                 { image in
                     if let image = image {
                         result(FlutterStandardTypedData(bytes: image))

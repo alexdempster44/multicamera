@@ -182,17 +182,20 @@ class Camera extends ChangeNotifier {
   /// Returns the image data as a [Uint8List] containing the image bytes, or
   /// `null` if the capture fails.
   ///
+  /// If [immediate] is `true`, the image is captured without waiting for a
+  /// stable exposure.
+  ///
   /// The camera must be initialized before calling this method.
   /// If initialization is in progress, this method waits for it to complete.
   ///
   /// Throws [StateError] if the camera has not been initialized.
-  Future<Uint8List?> captureImage() async {
+  Future<Uint8List?> captureImage({bool immediate = false}) async {
     await _ensureInitialized();
 
     final id = _id;
     if (id == null) return null;
 
-    return await MulticameraPlatform.instance.captureImage(id);
+    return await MulticameraPlatform.instance.captureImage(id, immediate);
   }
 
   Future<void> _ensureInitialized() async {
