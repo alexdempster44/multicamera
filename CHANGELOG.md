@@ -1,5 +1,6 @@
-## v1.3.11 (pending)
+## v1.3.11
 
+* Add optional `immediate` flag to `captureImage` to skip exposure levelling
 * (Android) Correct matrix calculation for previews
 * (Android) Increase minimum API level to 26
 * (Android) Update dependencies
