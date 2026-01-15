@@ -1,3 +1,7 @@
+## v1.3.12
+
+* (Android) Reopen errored camera handles
+
 ## v1.3.11
 
 * Add optional `immediate` flag to `captureImage` to skip exposure levelling
