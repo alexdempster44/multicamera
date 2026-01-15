@@ -33,6 +33,10 @@ class CameraHandle(
     val onStateChanged: () -> Unit,
     val onRecognitionImage: (Image, () -> Unit) -> Unit,
 ) : Closeable, CameraDevice.StateCallback() {
+    companion object {
+        private const val REOPEN_DELAY_MS = 1000L
+    }
+
     var surfaceProducers = listOf<TextureRegistry.SurfaceProducer>()
         set(value) {
             field = value
@@ -61,6 +65,7 @@ class CameraHandle(
     private var captureBusy = false
     private var exposureLevelled = false
     private var recognitionBusy = false
+    private var closeRequested = false
 
     private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
         override fun onCaptureCompleted(
@@ -340,14 +345,24 @@ class CameraHandle(
     override fun onDisconnected(camera: CameraDevice) {
         device = camera
         closeDevice()
+
+        if (!closeRequested) {
+            handler.postDelayed({ openDevice() }, REOPEN_DELAY_MS)
+        }
     }
 
     override fun onError(camera: CameraDevice, error: Int) {
         device = camera
         closeDevice()
+
+        if (!closeRequested) {
+            handler.postDelayed({ openDevice() }, REOPEN_DELAY_MS)
+        }
     }
 
     override fun close() {
+        closeRequested = true
+
         handler.post { closeDevice() }
         thread.quitSafely()
         thread.join()
