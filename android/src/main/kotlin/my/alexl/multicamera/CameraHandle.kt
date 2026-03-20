@@ -165,9 +165,13 @@ class CameraHandle(
         }, handler)
         this.captureImageReader = captureImageReader
 
+        val minRecognitionDimension = 640
+        val minRecognitionScale =
+            minRecognitionDimension.toDouble() / maxOf(size.width, size.height)
+        val recognitionScale = maxOf(0.2, minRecognitionScale).coerceAtMost(1.0)
         val recognitionImageReader = ImageReader.newInstance(
-            (size.width * 0.2).toInt(),
-            (size.height * 0.2).toInt(),
+            (size.width * recognitionScale).toInt(),
+            (size.height * recognitionScale).toInt(),
             ImageFormat.YUV_420_888,
             2
         )
