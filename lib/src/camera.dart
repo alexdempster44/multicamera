@@ -208,13 +208,13 @@ class Camera extends ChangeNotifier {
   Future<void> _updateCamera() async {
     notifyListeners();
 
-    if (!initialized || _pendingUpdate) return;
+    if (_pendingUpdate) return;
     _pendingUpdate = true;
 
     if (_initializeLock case final future?) await future;
 
     final id = _id;
-    if (id == null) {
+    if (!_initialized || id == null) {
       _pendingUpdate = false;
       return;
     }
