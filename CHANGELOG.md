@@ -1,3 +1,8 @@
+## v1.4.0
+
+* Require Flutter 3.41.0+ / Dart 3.11.0+
+* Fix race where camera direction/state changes during initialization were dropped
+
 ## v1.3.12
 
 * (Android) Reopen errored camera handles
