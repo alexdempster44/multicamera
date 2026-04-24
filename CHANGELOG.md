@@ -1,3 +1,7 @@
+## v1.4.1
+
+* (Android) Handle camera open race conditions on synchronous failure and close
+
 ## v1.4.0
 
 * Require Flutter 3.41.0+ / Dart 3.11.0+
