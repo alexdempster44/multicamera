@@ -230,6 +230,9 @@ class CameraHandle(
             cameraManager.openCamera(cameraId, this, null)
         } catch (_: Exception) {
             closeDevice()
+            if (!closeRequested) {
+                handler.postDelayed({ openDevice() }, REOPEN_DELAY_MS)
+            }
         }
     }
 
@@ -338,6 +341,11 @@ class CameraHandle(
     }
 
     override fun onOpened(camera: CameraDevice) {
+        if (closeRequested) {
+            camera.close()
+            return
+        }
+
         device = camera
         setupSession()
     }
