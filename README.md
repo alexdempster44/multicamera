@@ -1,5 +1,13 @@
 # Multicamera
 
+[![License](https://img.shields.io/github/license/alexdempster44/multicamera)](https://github.com/alexdempster44/multicamera/blob/main/LICENSE)
+[![Pub Version](https://img.shields.io/pub/v/multicamera.svg)](https://pub.dev/packages/multicamera)
+[![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue.svg)](https://github.com/alexdempster44/multicamera)
+[![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.41.0-02569B.svg?logo=flutter)](https://flutter.dev)
+[![Dart](https://img.shields.io/badge/Dart-%3E%3D3.11.0-0175C2.svg?logo=dart)](https://dart.dev)
+[![GitHub issues](https://img.shields.io/github/issues/alexdempster44/multicamera)](https://github.com/alexdempster44/multicamera/issues)
+[![GitHub pulls](https://img.shields.io/github/issues-pr/alexdempster44/multicamera)](https://github.com/alexdempster44/multicamera/pulls)
+
 A Flutter plugin for managing multiple camera instances simultaneously with built-in ML kit support.
 
 ## Features
@@ -18,7 +26,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  multicamera: ^1.4.2+1
+  multicamera: ^1.4.2+2
 ```
 
 Or install from the repository:
@@ -57,7 +65,8 @@ Add the following permissions to your `android/app/src/main/AndroidManifest.xml`
 
 ## Permissions
 
-**Important:** This plugin does not handle camera permission requests. It is the developer's responsibility to request and ensure that camera permissions have been granted before calling `camera.initialize()`.
+> [!IMPORTANT]
+> This plugin does not handle camera permission requests. It is the developer's responsibility to request and ensure that camera permissions have been granted before calling `camera.initialize()`.
 
 You can use the [permission_handler](https://pub.dev/packages/permission_handler) package or platform-specific permission APIs to request camera access:
 
