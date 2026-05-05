@@ -2,7 +2,7 @@ package my.alexl.multicamera
 
 import android.app.Activity
 import android.content.Context
-import android.view.OrientationEventListener
+import android.hardware.display.DisplayManager
 import android.view.Surface
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
@@ -25,7 +25,14 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
         private set
 
     private val registry = Registry(this)
-    private var orientationEventListener: OrientationEventListener? = null
+    private var displayManager: DisplayManager? = null
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) {}
+        override fun onDisplayRemoved(displayId: Int) {}
+        override fun onDisplayChanged(displayId: Int) {
+            updateDeviceOrientation()
+        }
+    }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "multicamera")
@@ -37,16 +44,15 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
-            "registerCamera" ->
-                result.success(
-                    registry.registerCamera(
-                        Camera.Direction.entries[call.argument<Int>("direction")!!],
-                        call.argument<Boolean>("paused")!!,
-                        call.argument<Boolean>("recognizeText")!!,
-                        call.argument<Boolean>("scanBarcodes")!!,
-                        call.argument<Boolean>("detectFaces")!!
-                    )
+            "registerCamera" -> result.success(
+                registry.registerCamera(
+                    Camera.Direction.entries[call.argument<Int>("direction")!!],
+                    call.argument<Boolean>("paused")!!,
+                    call.argument<Boolean>("recognizeText")!!,
+                    call.argument<Boolean>("scanBarcodes")!!,
+                    call.argument<Boolean>("detectFaces")!!
                 )
+            )
 
             "updateCamera" -> {
                 registry.updateCamera(
@@ -105,31 +111,25 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun startOrientationListener() {
         val activity = activity ?: return
 
-        orientationEventListener = object : OrientationEventListener(activity) {
-            override fun onOrientationChanged(orientation: Int) {
-                if (orientation == ORIENTATION_UNKNOWN) return
-
-                val rotation = arrayOf(
-                    Surface.ROTATION_0,
-                    Surface.ROTATION_270,
-                    Surface.ROTATION_180,
-                    Surface.ROTATION_90
-                )[((orientation + 45) % 360) / 90]
-
-                if (deviceOrientation != rotation) {
-                    deviceOrientation = rotation
-                    registry.onOrientationChanged()
-                }
+        displayManager =
+            (activity.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager).also {
+                it.registerDisplayListener(displayListener, null)
             }
-        }
+        updateDeviceOrientation()
+    }
 
-        if (orientationEventListener?.canDetectOrientation() == true) {
-            orientationEventListener?.enable()
+    private fun updateDeviceOrientation() {
+        val activity = activity ?: return
+
+        @Suppress("DEPRECATION") val rotation = activity.windowManager.defaultDisplay.rotation
+        if (deviceOrientation != rotation) {
+            deviceOrientation = rotation
+            registry.onOrientationChanged()
         }
     }
 
     private fun stopOrientationListener() {
-        orientationEventListener?.disable()
-        orientationEventListener = null
+        displayManager?.unregisterDisplayListener(displayListener)
+        displayManager = null
     }
 }
