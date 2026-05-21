@@ -73,6 +73,13 @@ class Registry {
         reconcile()
     }
 
+    func reset() {
+        for camera in cameras.values { camera.close() }
+        cameras.removeAll()
+        for handle in cameraHandles.values { handle.close() }
+        cameraHandles.removeAll()
+    }
+
     private func reconcile() {
         for direction in Camera.Direction.allCases {
             let cameras = cameras.values.filter { $0.direction == direction }

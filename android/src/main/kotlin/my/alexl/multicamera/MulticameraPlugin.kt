@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.hardware.display.DisplayManager
 import android.view.Surface
+import io.flutter.embedding.engine.dart.DartExecutor
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
@@ -40,6 +41,9 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
         textureRegistry = flutterPluginBinding.textureRegistry
         context = flutterPluginBinding.applicationContext
+
+        (flutterPluginBinding.binaryMessenger as? DartExecutor)
+            ?.setIsolateServiceIdListener { _ -> registry.reset() }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

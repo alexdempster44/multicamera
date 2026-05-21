@@ -5,6 +5,7 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
     let channel: FlutterMethodChannel
     let textures: FlutterTextureRegistry
     private(set) var registry: Registry!
+    private var isolateObservation: NSKeyValueObservation?
 
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = MulticameraPlugin(
@@ -15,6 +16,17 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
             textures: registrar.textures()
         )
         registrar.addMethodCallDelegate(instance, channel: instance.channel)
+
+        if let relay = registrar.messenger() as? NSObject,
+            let flutterEngine = relay.value(forKey: "parent") as? FlutterEngine
+        {
+            instance.isolateObservation = flutterEngine.observe(
+                \FlutterEngine.isolateId,
+                options: [.new]
+            ) { [weak instance] _, _ in
+                instance?.registry.reset()
+            }
+        }
     }
 
     init(channel: FlutterMethodChannel, textures: FlutterTextureRegistry) {

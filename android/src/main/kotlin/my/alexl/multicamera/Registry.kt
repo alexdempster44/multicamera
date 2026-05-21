@@ -52,6 +52,13 @@ class Registry(val plugin: MulticameraPlugin) {
         reconcile()
     }
 
+    fun reset() {
+        for (camera in cameras.values) camera.close()
+        cameras.clear()
+        for (handle in cameraHandles.values) handle.close()
+        cameraHandles.clear()
+    }
+
     fun captureImage(id: Long, immediate: Boolean, callback: (ByteArray?) -> Unit) {
         val camera = cameras[id]
         if (camera == null) {
