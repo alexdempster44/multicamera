@@ -9,7 +9,7 @@ class Camera(
     var paused: Boolean,
     var recognizeText: Boolean,
     var scanBarcodes: Boolean,
-    var detectFaces: Boolean
+    var detectFaces: Boolean,
 ) : Closeable {
     val surfaceProducer: TextureRegistry.SurfaceProducer =
         plugin.textureRegistry.createSurfaceProducer()
@@ -23,6 +23,6 @@ class Camera(
 
     enum class Direction {
         Front,
-        Back
+        Back,
     }
 }

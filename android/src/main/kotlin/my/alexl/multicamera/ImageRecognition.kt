@@ -19,7 +19,7 @@ object ImageRecognition {
         recognizeText: Boolean,
         scanBarcodes: Boolean,
         detectFaces: Boolean,
-        onResults: (Results) -> Unit
+        onResults: (Results) -> Unit,
     ) {
         var textRecognitionRequired = recognizeText
         var barcodeScanningRequired = scanBarcodes
@@ -40,31 +40,37 @@ object ImageRecognition {
         }
 
         if (textRecognitionRequired) {
-            textRecognizer.process(inputImage).addOnSuccessListener { result ->
-                text = result.textBlocks.map { it.text }
-                checkComplete()
-            }.addOnFailureListener {
-                textRecognitionRequired = false
-                checkComplete()
-            }
+            textRecognizer
+                .process(inputImage)
+                .addOnSuccessListener { result ->
+                    text = result.textBlocks.map { it.text }
+                    checkComplete()
+                }.addOnFailureListener {
+                    textRecognitionRequired = false
+                    checkComplete()
+                }
         }
         if (barcodeScanningRequired) {
-            barcodeScanner.process(inputImage).addOnSuccessListener { result ->
-                barcodes = result.mapNotNull { it.rawValue }
-                checkComplete()
-            }.addOnFailureListener {
-                barcodeScanningRequired = false
-                checkComplete()
-            }
+            barcodeScanner
+                .process(inputImage)
+                .addOnSuccessListener { result ->
+                    barcodes = result.mapNotNull { it.rawValue }
+                    checkComplete()
+                }.addOnFailureListener {
+                    barcodeScanningRequired = false
+                    checkComplete()
+                }
         }
         if (faceDetectionRequired) {
-            faceDetector.process(inputImage).addOnSuccessListener { result ->
-                face = result.isNotEmpty()
-                checkComplete()
-            }.addOnFailureListener {
-                faceDetectionRequired = false
-                checkComplete()
-            }
+            faceDetector
+                .process(inputImage)
+                .addOnSuccessListener { result ->
+                    face = result.isNotEmpty()
+                    checkComplete()
+                }.addOnFailureListener {
+                    faceDetectionRequired = false
+                    checkComplete()
+                }
         }
 
         checkComplete()
@@ -73,6 +79,6 @@ object ImageRecognition {
     data class Results(
         val text: List<String>?,
         val barcodes: List<String>?,
-        val face: Boolean?
+        val face: Boolean?,
     )
 }

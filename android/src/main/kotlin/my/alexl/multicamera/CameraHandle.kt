@@ -32,7 +32,8 @@ class CameraHandle(
     val direction: Camera.Direction,
     val onStateChanged: () -> Unit,
     val onRecognitionImage: (Image, () -> Unit) -> Unit,
-) : Closeable, CameraDevice.StateCallback() {
+) : CameraDevice.StateCallback(),
+    Closeable {
     companion object {
         private const val REOPEN_DELAY_MS = 1000L
     }
@@ -40,10 +41,11 @@ class CameraHandle(
     var surfaceProducers = listOf<TextureRegistry.SurfaceProducer>()
         set(value) {
             field = value
-            previewFanOut.surfaces = value.map {
-                it.setSize(size.width, size.height)
-                it.surface
-            }
+            previewFanOut.surfaces =
+                value.map {
+                    it.setSize(size.width, size.height)
+                    it.surface
+                }
 
             setupSession()
         }
@@ -67,34 +69,41 @@ class CameraHandle(
     private var recognitionBusy = false
     private var closeRequested = false
 
-    private val captureCallback = object : CameraCaptureSession.CaptureCallback() {
-        override fun onCaptureCompleted(
-            session: CameraCaptureSession,
-            request: CaptureRequest,
-            result: TotalCaptureResult
-        ) {
-            exposureLevelled = listOf(
-                CaptureResult.CONTROL_AE_STATE_CONVERGED,
-                CaptureResult.CONTROL_AE_STATE_LOCKED
-            ).contains(result.get(CaptureResult.CONTROL_AE_STATE))
+    private val captureCallback =
+        object : CameraCaptureSession.CaptureCallback() {
+            override fun onCaptureCompleted(
+                session: CameraCaptureSession,
+                request: CaptureRequest,
+                result: TotalCaptureResult,
+            ) {
+                exposureLevelled =
+                    listOf(
+                        CaptureResult.CONTROL_AE_STATE_CONVERGED,
+                        CaptureResult.CONTROL_AE_STATE_LOCKED,
+                    ).contains(result.get(CaptureResult.CONTROL_AE_STATE))
 
-            val hasStableCapture = pendingCaptureCallbacks.isNotEmpty() && exposureLevelled
-            val hasImmediateCapture = pendingImmediateCaptureCallbacks.isNotEmpty()
-            val hasCapture = hasStableCapture || hasImmediateCapture
+                val hasStableCapture = pendingCaptureCallbacks.isNotEmpty() && exposureLevelled
+                val hasImmediateCapture = pendingImmediateCaptureCallbacks.isNotEmpty()
+                val hasCapture = hasStableCapture || hasImmediateCapture
 
-            if (!captureBusy && hasCapture) {
-                captureBusy = true
-                setupSessionRequest(capture = true)
+                if (!captureBusy && hasCapture) {
+                    captureBusy = true
+                    setupSessionRequest(capture = true)
+                }
             }
         }
-    }
 
     private val cameraManager: CameraManager by lazy {
         plugin.context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     }
 
     init {
-        handler.post @RequiresPermission(Manifest.permission.CAMERA) { openDevice() }
+        postOpenDevice()
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun postOpenDevice() {
+        handler.post { openDevice() }
     }
 
     fun updateOrientation() {
@@ -104,7 +113,10 @@ class CameraHandle(
         }
     }
 
-    fun captureImage(immediate: Boolean, callback: (ByteArray?) -> Unit) {
+    fun captureImage(
+        immediate: Boolean,
+        callback: (ByteArray?) -> Unit,
+    ) {
         handler.post {
             if (immediate) {
                 pendingImmediateCaptureCallbacks.add(callback)
@@ -115,7 +127,8 @@ class CameraHandle(
     }
 
     private fun setupSession() {
-        val sessionRequired = surfaceProducers.isNotEmpty() ||
+        val sessionRequired =
+            surfaceProducers.isNotEmpty() ||
                 pendingCaptureCallbacks.isNotEmpty() ||
                 pendingImmediateCaptureCallbacks.isNotEmpty()
         val hasSession = session != null
@@ -134,12 +147,13 @@ class CameraHandle(
 
         val previewSurface = previewFanOut.ensureSurface(size)
 
-        val captureImageReader = ImageReader.newInstance(
-            size.width,
-            size.height,
-            ImageFormat.JPEG,
-            2
-        )
+        val captureImageReader =
+            ImageReader.newInstance(
+                size.width,
+                size.height,
+                ImageFormat.JPEG,
+                2,
+            )
         captureImageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireNextImage() ?: return@setOnImageAvailableListener
 
@@ -165,12 +179,13 @@ class CameraHandle(
         }, handler)
         this.captureImageReader = captureImageReader
 
-        val recognitionImageReader = ImageReader.newInstance(
-            (size.width * 0.2).toInt(),
-            (size.height * 0.2).toInt(),
-            ImageFormat.YUV_420_888,
-            2
-        )
+        val recognitionImageReader =
+            ImageReader.newInstance(
+                (size.width * 0.2).toInt(),
+                (size.height * 0.2).toInt(),
+                ImageFormat.YUV_420_888,
+                2,
+            )
         recognitionImageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireNextImage() ?: return@setOnImageAvailableListener
 
@@ -194,7 +209,7 @@ class CameraHandle(
             listOf(
                 previewSurface,
                 captureImageReader.surface,
-                recognitionImageReader.surface
+                recognitionImageReader.surface,
             ),
             object : CameraCaptureSession.StateCallback() {
                 override fun onConfigured(captureSession: CameraCaptureSession) {
@@ -204,23 +219,25 @@ class CameraHandle(
 
                 override fun onConfigureFailed(session: CameraCaptureSession) {}
             },
-            handler
+            handler,
         )
     }
 
     @RequiresPermission(Manifest.permission.CAMERA)
     private fun openDevice() {
         try {
-            val lensFacing = when (direction) {
-                Camera.Direction.Front -> CameraCharacteristics.LENS_FACING_FRONT
-                Camera.Direction.Back -> CameraCharacteristics.LENS_FACING_BACK
-            }
+            val lensFacing =
+                when (direction) {
+                    Camera.Direction.Front -> CameraCharacteristics.LENS_FACING_FRONT
+                    Camera.Direction.Back -> CameraCharacteristics.LENS_FACING_BACK
+                }
 
             val cameraIds = cameraManager.cameraIdList
-            val cameraId = cameraIds.firstOrNull {
-                val chars = cameraManager.getCameraCharacteristics(it)
-                chars.get(CameraCharacteristics.LENS_FACING) == lensFacing
-            } ?: cameraIds.first()
+            val cameraId =
+                cameraIds.firstOrNull {
+                    val chars = cameraManager.getCameraCharacteristics(it)
+                    chars.get(CameraCharacteristics.LENS_FACING) == lensFacing
+                } ?: cameraIds.first()
 
             characteristics = cameraManager.getCameraCharacteristics(cameraId)
             calculateSize()
@@ -245,10 +262,12 @@ class CameraHandle(
         val size = sizes.maxBy { it.width * it.height }
         this.size = size
 
-        previewFanOut.refreshSurfaces(surfaceProducers.map {
-            it.setSize(size.width, size.height)
-            it.surface
-        })
+        previewFanOut.refreshSurfaces(
+            surfaceProducers.map {
+                it.setSize(size.width, size.height)
+                it.surface
+            },
+        )
     }
 
     private fun calculateQuarterTurns() {
@@ -256,18 +275,20 @@ class CameraHandle(
         val sensorOrientation =
             characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: return
 
-        val degrees = when (plugin.deviceOrientation) {
-            Surface.ROTATION_0 -> 0
-            Surface.ROTATION_90 -> 90
-            Surface.ROTATION_180 -> 180
-            Surface.ROTATION_270 -> 270
-            else -> return
-        }
+        val degrees =
+            when (plugin.deviceOrientation) {
+                Surface.ROTATION_0 -> 0
+                Surface.ROTATION_90 -> 90
+                Surface.ROTATION_180 -> 180
+                Surface.ROTATION_270 -> 270
+                else -> return
+            }
 
-        val rotation = when (direction) {
-            Camera.Direction.Front -> (sensorOrientation + degrees) % 360
-            Camera.Direction.Back -> (sensorOrientation - degrees + 360) % 360
-        }
+        val rotation =
+            when (direction) {
+                Camera.Direction.Front -> (sensorOrientation + degrees) % 360
+                Camera.Direction.Back -> (sensorOrientation - degrees + 360) % 360
+            }
 
         quarterTurns = rotation / 90
         previewFanOut.quarterTurns = quarterTurns
@@ -279,12 +300,13 @@ class CameraHandle(
             FileOutputStream(file).use { it.write(bytes) }
 
             val exif = ExifInterface(file.absolutePath)
-            val exifOrientation = when (quarterTurns % 4) {
-                1 -> ExifInterface.ORIENTATION_ROTATE_90
-                2 -> ExifInterface.ORIENTATION_ROTATE_180
-                3 -> ExifInterface.ORIENTATION_ROTATE_270
-                else -> ExifInterface.ORIENTATION_NORMAL
-            }
+            val exifOrientation =
+                when (quarterTurns % 4) {
+                    1 -> ExifInterface.ORIENTATION_ROTATE_90
+                    2 -> ExifInterface.ORIENTATION_ROTATE_180
+                    3 -> ExifInterface.ORIENTATION_ROTATE_270
+                    else -> ExifInterface.ORIENTATION_NORMAL
+                }
             exif.setAttribute(ExifInterface.TAG_ORIENTATION, exifOrientation.toString())
             exif.saveAttributes()
 
@@ -302,13 +324,14 @@ class CameraHandle(
         val captureImageReader = captureImageReader ?: return
         val recognitionImageReader = recognitionImageReader ?: return
 
-        val request = device
-            .createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
-            .apply {
-                addTarget(previewSurface)
-                if (capture) addTarget(captureImageReader.surface)
-                addTarget(recognitionImageReader.surface)
-            }
+        val request =
+            device
+                .createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                .apply {
+                    addTarget(previewSurface)
+                    if (capture) addTarget(captureImageReader.surface)
+                    addTarget(recognitionImageReader.surface)
+                }
 
         try {
             if (capture) {
@@ -359,7 +382,10 @@ class CameraHandle(
         }
     }
 
-    override fun onError(camera: CameraDevice, error: Int) {
+    override fun onError(
+        camera: CameraDevice,
+        error: Int,
+    ) {
         device = camera
         closeDevice()
 

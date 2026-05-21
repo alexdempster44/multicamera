@@ -4,7 +4,9 @@ import android.media.Image
 import android.os.Handler
 import android.os.Looper
 
-class Registry(val plugin: MulticameraPlugin) {
+class Registry(
+    val plugin: MulticameraPlugin,
+) {
     val cameras = HashMap<Long, Camera>()
     val cameraHandles = HashMap<Camera.Direction, CameraHandle>()
 
@@ -13,16 +15,17 @@ class Registry(val plugin: MulticameraPlugin) {
         paused: Boolean,
         recognizeText: Boolean,
         scanBarcodes: Boolean,
-        detectFaces: Boolean
+        detectFaces: Boolean,
     ): Long {
-        val camera = Camera(
-            plugin,
-            direction,
-            paused,
-            recognizeText,
-            scanBarcodes,
-            detectFaces
-        )
+        val camera =
+            Camera(
+                plugin,
+                direction,
+                paused,
+                recognizeText,
+                scanBarcodes,
+                detectFaces,
+            )
         cameras[camera.id] = camera
         reconcile()
 
@@ -35,7 +38,7 @@ class Registry(val plugin: MulticameraPlugin) {
         paused: Boolean,
         recognizeText: Boolean,
         scanBarcodes: Boolean,
-        detectFaces: Boolean
+        detectFaces: Boolean,
     ) {
         cameras[id]?.let {
             it.direction = direction
@@ -59,7 +62,11 @@ class Registry(val plugin: MulticameraPlugin) {
         cameraHandles.clear()
     }
 
-    fun captureImage(id: Long, immediate: Boolean, callback: (ByteArray?) -> Unit) {
+    fun captureImage(
+        id: Long,
+        immediate: Boolean,
+        callback: (ByteArray?) -> Unit,
+    ) {
         val camera = cameras[id]
         if (camera == null) {
             callback(null)
@@ -87,20 +94,21 @@ class Registry(val plugin: MulticameraPlugin) {
             val handleRequired = !cameras.isEmpty()
 
             if (handleRequired) {
-                val handle = cameraHandles.computeIfAbsent(direction) {
-                    CameraHandle(
-                        plugin,
-                        direction,
-                        onStateChanged = { updateFlutterCameras(direction) },
-                        onRecognitionImage = { image, onComplete ->
-                            onRecognitionImage(
-                                image,
-                                direction,
-                                onComplete
-                            )
-                        }
-                    )
-                }
+                val handle =
+                    cameraHandles.computeIfAbsent(direction) {
+                        CameraHandle(
+                            plugin,
+                            direction,
+                            onStateChanged = { updateFlutterCameras(direction) },
+                            onRecognitionImage = { image, onComplete ->
+                                onRecognitionImage(
+                                    image,
+                                    direction,
+                                    onComplete,
+                                )
+                            },
+                        )
+                    }
                 handle.surfaceProducers = cameras.filter { !it.paused }.map { it.surfaceProducer }
             } else {
                 cameraHandles.remove(direction)?.close()
@@ -127,7 +135,7 @@ class Registry(val plugin: MulticameraPlugin) {
                         "id" to camera.id,
                         "width" to width,
                         "height" to height,
-                    )
+                    ),
                 )
             }
         }
@@ -136,7 +144,7 @@ class Registry(val plugin: MulticameraPlugin) {
     private fun onRecognitionImage(
         image: Image,
         direction: Camera.Direction,
-        onComplete: () -> Unit
+        onComplete: () -> Unit,
     ) {
         val cameras = cameras.values.filter { it.direction == direction && !it.paused }
 
@@ -149,7 +157,7 @@ class Registry(val plugin: MulticameraPlugin) {
                 image,
                 recognizeText,
                 scanBarcodes,
-                detectFaces
+                detectFaces,
             ) { results ->
                 val cameras = this.cameras.values.filter { it.direction == direction && !it.paused }
                 for (camera in cameras) {
@@ -160,8 +168,8 @@ class Registry(val plugin: MulticameraPlugin) {
                                 "id" to camera.id,
                                 "text" to results.text,
                                 "barcodes" to results.barcodes,
-                                "face" to results.face
-                            )
+                                "face" to results.face,
+                            ),
                         )
                     }
                 }

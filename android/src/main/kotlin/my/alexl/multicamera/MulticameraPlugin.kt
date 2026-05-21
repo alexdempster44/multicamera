@@ -13,7 +13,10 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.view.TextureRegistry
 
-class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
+class MulticameraPlugin :
+    FlutterPlugin,
+    MethodCallHandler,
+    ActivityAware {
     lateinit var channel: MethodChannel
         private set
     lateinit var textureRegistry: TextureRegistry
@@ -27,13 +30,16 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
 
     private val registry = Registry(this)
     private var displayManager: DisplayManager? = null
-    private val displayListener = object : DisplayManager.DisplayListener {
-        override fun onDisplayAdded(displayId: Int) {}
-        override fun onDisplayRemoved(displayId: Int) {}
-        override fun onDisplayChanged(displayId: Int) {
-            updateDeviceOrientation()
+    private val displayListener =
+        object : DisplayManager.DisplayListener {
+            override fun onDisplayAdded(displayId: Int) {}
+
+            override fun onDisplayRemoved(displayId: Int) {}
+
+            override fun onDisplayChanged(displayId: Int) {
+                updateDeviceOrientation()
+            }
         }
-    }
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "multicamera")
@@ -46,17 +52,22 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             ?.setIsolateServiceIdListener { _ -> registry.reset() }
     }
 
-    override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+    override fun onMethodCall(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
         when (call.method) {
-            "registerCamera" -> result.success(
-                registry.registerCamera(
-                    Camera.Direction.entries[call.argument<Int>("direction")!!],
-                    call.argument<Boolean>("paused")!!,
-                    call.argument<Boolean>("recognizeText")!!,
-                    call.argument<Boolean>("scanBarcodes")!!,
-                    call.argument<Boolean>("detectFaces")!!
+            "registerCamera" -> {
+                result.success(
+                    registry.registerCamera(
+                        Camera.Direction.entries[call.argument<Int>("direction")!!],
+                        call.argument<Boolean>("paused")!!,
+                        call.argument<Boolean>("recognizeText")!!,
+                        call.argument<Boolean>("scanBarcodes")!!,
+                        call.argument<Boolean>("detectFaces")!!,
+                    ),
                 )
-            )
+            }
 
             "updateCamera" -> {
                 registry.updateCamera(
@@ -65,7 +76,7 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                     call.argument<Boolean>("paused")!!,
                     call.argument<Boolean>("recognizeText")!!,
                     call.argument<Boolean>("scanBarcodes")!!,
-                    call.argument<Boolean>("detectFaces")!!
+                    call.argument<Boolean>("detectFaces")!!,
                 )
                 result.success(null)
             }
@@ -73,7 +84,7 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
             "captureImage" -> {
                 registry.captureImage(
                     call.argument<Long>("id")!!,
-                    call.argument<Boolean>("immediate")!!
+                    call.argument<Boolean>("immediate")!!,
                 ) {
                     result.success(it)
                 }
@@ -84,7 +95,9 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
                 result.success(null)
             }
 
-            else -> result.notImplemented()
+            else -> {
+                result.notImplemented()
+            }
         }
     }
 
@@ -125,7 +138,8 @@ class MulticameraPlugin : FlutterPlugin, MethodCallHandler, ActivityAware {
     private fun updateDeviceOrientation() {
         val activity = activity ?: return
 
-        @Suppress("DEPRECATION") val rotation = activity.windowManager.defaultDisplay.rotation
+        @Suppress("DEPRECATION")
+        val rotation = activity.windowManager.defaultDisplay.rotation
         if (deviceOrientation != rotation) {
             deviceOrientation = rotation
             registry.onOrientationChanged()

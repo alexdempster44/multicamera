@@ -20,7 +20,9 @@ import java.nio.ByteOrder
 import java.util.concurrent.CountDownLatch
 import kotlin.properties.Delegates
 
-class PreviewFanOut(val direction: Camera.Direction) : Closeable {
+class PreviewFanOut(
+    val direction: Camera.Direction,
+) : Closeable {
     private val thread = HandlerThread("my.alexl.multicamera.preview").apply { start() }
     private val handler = Handler(thread.looper)
     private lateinit var egl: EGL
@@ -48,15 +50,16 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
     }
 
     fun ensureSurface(size: Size): Surface {
-        val surfaceTexture = surfaceTexture ?: run {
-            val surfaceTexture = SurfaceTexture(this.egl.texture)
-            surfaceTexture.setOnFrameAvailableListener {
-                this.handler.post { this.drawFrame() }
-            }
+        val surfaceTexture =
+            surfaceTexture ?: run {
+                val surfaceTexture = SurfaceTexture(this.egl.texture)
+                surfaceTexture.setOnFrameAvailableListener {
+                    this.handler.post { this.drawFrame() }
+                }
 
-            this.surfaceTexture = surfaceTexture
-            surfaceTexture
-        }
+                this.surfaceTexture = surfaceTexture
+                surfaceTexture
+            }
         surfaceTexture.setDefaultBufferSize(size.width, size.height)
 
         return surface ?: run {
@@ -105,16 +108,18 @@ class PreviewFanOut(val direction: Camera.Direction) : Closeable {
         surfaceTexture.getTransformMatrix(textureMatrix)
 
         var quarterTurns = this.quarterTurns
-        quarterTurns *= when (direction) {
-            Camera.Direction.Front -> -1
-            Camera.Direction.Back -> 1
-        }
-        quarterTurns -= when {
-            textureMatrix[0] > 0.5f -> 0
-            textureMatrix[1] > 0.5f -> 1
-            textureMatrix[0] < -0.5f -> 2
-            else -> 3
-        }
+        quarterTurns *=
+            when (direction) {
+                Camera.Direction.Front -> -1
+                Camera.Direction.Back -> 1
+            }
+        quarterTurns -=
+            when {
+                textureMatrix[0] > 0.5f -> 0
+                textureMatrix[1] > 0.5f -> 1
+                textureMatrix[0] < -0.5f -> 2
+                else -> 3
+            }
 
         Matrix.translateM(textureMatrix, 0, 0.5F, 0.5F, 0F)
         Matrix.rotateM(textureMatrix, 0, quarterTurns * 90.0F, 0F, 0F, 1F)
@@ -169,16 +174,24 @@ class EGL : Closeable {
     }
 
     private fun createConfig() {
-        val attributes = intArrayOf(
-            EGL14.EGL_RED_SIZE, 8,
-            EGL14.EGL_GREEN_SIZE, 8,
-            EGL14.EGL_BLUE_SIZE, 8,
-            EGL14.EGL_ALPHA_SIZE, 8,
-            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-            EGL14.EGL_SURFACE_TYPE, EGL14.EGL_WINDOW_BIT,
-            EGLExt.EGL_RECORDABLE_ANDROID, 1,
-            EGL14.EGL_NONE
-        )
+        val attributes =
+            intArrayOf(
+                EGL14.EGL_RED_SIZE,
+                8,
+                EGL14.EGL_GREEN_SIZE,
+                8,
+                EGL14.EGL_BLUE_SIZE,
+                8,
+                EGL14.EGL_ALPHA_SIZE,
+                8,
+                EGL14.EGL_RENDERABLE_TYPE,
+                EGL14.EGL_OPENGL_ES2_BIT,
+                EGL14.EGL_SURFACE_TYPE,
+                EGL14.EGL_WINDOW_BIT,
+                EGLExt.EGL_RECORDABLE_ANDROID,
+                1,
+                EGL14.EGL_NONE,
+            )
         val configs = arrayOfNulls<EGLConfig>(1)
         val count = IntArray(1)
 
@@ -187,10 +200,12 @@ class EGL : Closeable {
     }
 
     private fun createContext() {
-        val attributes = intArrayOf(
-            EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
-            EGL14.EGL_NONE
-        )
+        val attributes =
+            intArrayOf(
+                EGL14.EGL_CONTEXT_CLIENT_VERSION,
+                2,
+                EGL14.EGL_NONE,
+            )
 
         context = EGL14.eglCreateContext(display, config, EGL14.EGL_NO_CONTEXT, attributes, 0)
     }
@@ -203,22 +218,22 @@ class EGL : Closeable {
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_MIN_FILTER,
-            GLES20.GL_LINEAR
+            GLES20.GL_LINEAR,
         )
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_MAG_FILTER,
-            GLES20.GL_LINEAR
+            GLES20.GL_LINEAR,
         )
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_WRAP_S,
-            GLES20.GL_CLAMP_TO_EDGE
+            GLES20.GL_CLAMP_TO_EDGE,
         )
         GLES20.glTexParameteri(
             GLES11Ext.GL_TEXTURE_EXTERNAL_OES,
             GLES20.GL_TEXTURE_WRAP_T,
-            GLES20.GL_CLAMP_TO_EDGE
+            GLES20.GL_CLAMP_TO_EDGE,
         )
 
         texture = id[0]
@@ -242,7 +257,10 @@ class EGL : Closeable {
         EGL14.eglMakeCurrent(display, surface, surface, context)
     }
 
-    fun drawSurface(surface: EGLSurface, textureMatrix: FloatArray) {
+    fun drawSurface(
+        surface: EGLSurface,
+        textureMatrix: FloatArray,
+    ) {
         bindSurface(surface)
 
         val width = IntArray(1)
@@ -254,12 +272,13 @@ class EGL : Closeable {
         GLES20.glClearColor(1.0F, 0.0F, 1.0F, 1.0F)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
-        val program = program ?: run {
-            val program = Program()
+        val program =
+            program ?: run {
+                val program = Program()
 
-            this.program = program
-            program
-        }
+                this.program = program
+                program
+            }
         program.draw(texture, textureMatrix)
 
         EGL14.eglSwapBuffers(display, surface)
@@ -274,7 +293,7 @@ class EGL : Closeable {
             display,
             EGL14.EGL_NO_SURFACE,
             EGL14.EGL_NO_SURFACE,
-            EGL14.EGL_NO_CONTEXT
+            EGL14.EGL_NO_CONTEXT,
         )
 
         program?.close()
@@ -296,11 +315,23 @@ private class Program : Closeable {
         ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder()).asFloatBuffer().apply {
             put(
                 floatArrayOf(
-                    -1f, -1f, 0f, 1f,
-                    1f, -1f, 1f, 1f,
-                    -1f, 1f, 0f, 0f,
-                    1f, 1f, 1f, 0f,
-                )
+                    -1f,
+                    -1f,
+                    0f,
+                    1f,
+                    1f,
+                    -1f,
+                    1f,
+                    1f,
+                    -1f,
+                    1f,
+                    0f,
+                    0f,
+                    1f,
+                    1f,
+                    1f,
+                    0f,
+                ),
             ).position(0)
         }
 
@@ -322,7 +353,10 @@ private class Program : Closeable {
         uTextureMatrixLocation = GLES20.glGetUniformLocation(program, "uTextureMatrix")
     }
 
-    private fun compileShader(type: Int, source: String): Int {
+    private fun compileShader(
+        type: Int,
+        source: String,
+    ): Int {
         val shader = GLES20.glCreateShader(type)
         GLES20.glShaderSource(shader, source)
         GLES20.glCompileShader(shader)
@@ -331,7 +365,8 @@ private class Program : Closeable {
     }
 
     companion object {
-        val vertexShaderSource = """
+        val vertexShaderSource =
+            """
             attribute vec2 aPosition;
             attribute vec2 aTexture;
 
@@ -343,9 +378,10 @@ private class Program : Closeable {
                 vec4 texture = uTextureMatrix * vec4(aTexture, 0.0, 1.0);
                 vTexture = texture.xy;
             }
-        """.trimIndent()
+            """.trimIndent()
 
-        val fragmentShaderSource = """
+        val fragmentShaderSource =
+            """
             #extension GL_OES_EGL_image_external : require
             precision mediump float;
 
@@ -356,10 +392,13 @@ private class Program : Closeable {
             void main(){
                 gl_FragColor = texture2D(uTexture, vTexture);
             }
-        """.trimIndent()
+            """.trimIndent()
     }
 
-    fun draw(texture: Int, textureMatrix: FloatArray) {
+    fun draw(
+        texture: Int,
+        textureMatrix: FloatArray,
+    ) {
         GLES20.glUseProgram(program)
 
         vb.position(0)
