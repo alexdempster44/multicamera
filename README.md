@@ -5,6 +5,7 @@
 [![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android-blue.svg)](https://github.com/alexdempster44/multicamera)
 [![Flutter](https://img.shields.io/badge/Flutter-%3E%3D3.41.0-02569B.svg?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-%3E%3D3.11.0-0175C2.svg?logo=dart)](https://dart.dev)
+[![CI](https://github.com/alexdempster44/multicamera/actions/workflows/ci.yml/badge.svg)](https://github.com/alexdempster44/multicamera/actions/workflows/ci.yml)
 [![GitHub issues](https://img.shields.io/github/issues/alexdempster44/multicamera)](https://github.com/alexdempster44/multicamera/issues)
 [![GitHub pulls](https://img.shields.io/github/issues-pr/alexdempster44/multicamera)](https://github.com/alexdempster44/multicamera/pulls)
 
@@ -26,7 +27,7 @@ Add this to your package's `pubspec.yaml` file:
 
 ```yaml
 dependencies:
-  multicamera: ^1.4.2+2
+  multicamera: ^1.5.0
 ```
 
 Or install from the repository:

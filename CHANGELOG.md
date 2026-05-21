@@ -1,3 +1,7 @@
+## v1.5.0
+
+- Reset registry on hot restart
+
 ## v1.4.2
 
 - (Android) Fix preview rotation on portrait-locked devices
