@@ -25,9 +25,8 @@ class MulticameraPlugin :
         private set
     var activity: Activity? = null
         private set
-    var deviceOrientation = Surface.ROTATION_0
-        private set
 
+    private var deviceOrientation = Surface.ROTATION_0
     private val registry = Registry(this)
     private var displayManager: DisplayManager? = null
     private val displayListener =
@@ -136,15 +135,16 @@ class MulticameraPlugin :
     }
 
     private fun updateDeviceOrientation() {
-        val activity = activity ?: return
-
-        @Suppress("DEPRECATION")
-        val rotation = activity.windowManager.defaultDisplay.rotation
+        val rotation = currentDeviceOrientation
         if (deviceOrientation != rotation) {
             deviceOrientation = rotation
             registry.onOrientationChanged()
         }
     }
+
+    @Suppress("DEPRECATION")
+    val currentDeviceOrientation: Int
+        get() = activity?.windowManager?.defaultDisplay?.rotation ?: deviceOrientation
 
     private fun stopOrientationListener() {
         displayManager?.unregisterDisplayListener(displayListener)

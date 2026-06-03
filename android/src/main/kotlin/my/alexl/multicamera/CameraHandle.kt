@@ -276,7 +276,7 @@ class CameraHandle(
             characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: return
 
         val degrees =
-            when (plugin.deviceOrientation) {
+            when (plugin.currentDeviceOrientation) {
                 Surface.ROTATION_0 -> 0
                 Surface.ROTATION_90 -> 90
                 Surface.ROTATION_180 -> 180
