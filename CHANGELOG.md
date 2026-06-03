@@ -1,3 +1,7 @@
+## v1.5.1
+
+- (Android) Use activity display rotation for preview orientation when available
+
 ## v1.5.0
 
 - Reset registry on hot restart
