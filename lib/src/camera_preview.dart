@@ -86,11 +86,11 @@ class _CameraPreviewState extends State<CameraPreview> {
     final id = widget.camera.id;
     if (id == null) return const Icon(Icons.warning);
 
-    final frontCamera = widget.camera.direction == CameraDirection.front;
+    final frontCamera = widget.camera.direction == .front;
 
     return ClipRect(
       child: FittedBox(
-        fit: widget.crop ? BoxFit.cover : BoxFit.contain,
+        fit: widget.crop ? .cover : .contain,
         child: Transform.flip(
           flipX: frontCamera && widget.mirror,
           child: SizedBox(

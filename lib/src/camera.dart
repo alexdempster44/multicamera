@@ -104,15 +104,14 @@ class Camera extends ChangeNotifier {
 
   /// Creates a new [Camera] instance.
   ///
-  /// The [direction] parameter specifies which camera to use (front or back).
-  /// The [paused] parameter specifies whether the camera should start paused.
+  /// The [_direction] parameter specifies which camera to use (front or back).
+  /// The [_paused] parameter specifies whether the camera should start paused.
   ///
   /// Call [initialize] before using the camera.
   Camera({
-    CameraDirection direction = CameraDirection.front,
-    bool paused = false,
-  }) : _direction = direction,
-       _paused = paused;
+    this._direction = .front,
+    this._paused = false,
+  });
 
   @internal
   static void setSize(int id, (int, int) size) {

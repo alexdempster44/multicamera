@@ -1,3 +1,9 @@
+## v1.6.0
+
+- Require Flutter 3.44.0+ / Dart 3.12.0+
+- (Android) Migrate to built-in Kotlin: Android Gradle Plugin 9, Gradle 9.1, Kotlin 2.3.20, Java 17
+- Update dependencies
+
 ## v1.5.1
 
 - (Android) Use activity display rotation for preview orientation when available

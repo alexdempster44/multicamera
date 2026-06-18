@@ -55,25 +55,25 @@ packages:
     dependency: transitive
     description:
       name: meta
-      sha256: "23f08335362185a5ea2ad3a4e597f1375e78bce8a040df5c600c8d3552ef2394"
+      sha256: "1741988757a65eb6b36abe716829688cf01910bbf91c34354ff7ec1c3de2b349"
       url: "https://pub.dev"
     source: hosted
-    version: "1.17.0"
+    version: "1.18.0"
   multicamera:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "1.5.1"
+    version: "1.6.0"
   permission_handler:
     dependency: "direct main"
     description:
       name: permission_handler
-      sha256: bc917da36261b00137bbc8896bf1482169cd76f866282368948f032c8c1caae1
+      sha256: fe54465bcc62a4564c6e4db337bbaded6c0c0fa6e10487414436d163114784f6
       url: "https://pub.dev"
     source: hosted
-    version: "12.0.1"
+    version: "12.0.3"
   permission_handler_android:
     dependency: transitive
     description:
@@ -144,5 +144,5 @@ packages:
     source: hosted
     version: "1.1.1"
 sdks:
-  dart: ">=3.11.0 <4.0.0"
-  flutter: "3.41.7"
+  dart: ">=3.12.0 <4.0.0"
+  flutter: "3.44.2"
