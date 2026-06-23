@@ -120,9 +120,11 @@ public class MulticameraPlugin: NSObject, FlutterPlugin {
         )
         return
       }
+      let mirror = arguments["mirror"] as? Bool ?? false
       registry.captureImage(
         id: id,
         immediate: immediate,
+        mirror: mirror,
         { image in
           if let image = image {
             result(FlutterStandardTypedData(bytes: image))

@@ -65,6 +65,7 @@ class Registry(
     fun captureImage(
         id: Long,
         immediate: Boolean,
+        mirror: Boolean,
         callback: (ByteArray?) -> Unit,
     ) {
         val camera = cameras[id]
@@ -79,7 +80,7 @@ class Registry(
             return
         }
 
-        handle.captureImage(immediate, callback)
+        handle.captureImage(immediate, mirror, callback)
     }
 
     fun onOrientationChanged() {

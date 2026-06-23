@@ -31,8 +31,8 @@ class CameraHandle: NSObject {
   private let queue: DispatchQueue
   private let ciContext = CIContext()
   private var cameras: [Camera] = []
-  private var pendingCaptureCallbacks: [(Data?) -> Void] = []
-  private var pendingImmediateCaptureCallbacks: [(Data?) -> Void] = []
+  private var pendingCaptureCallbacks: [(mirror: Bool, callback: (Data?) -> Void)] = []
+  private var pendingImmediateCaptureCallbacks: [(mirror: Bool, callback: (Data?) -> Void)] = []
   private var lastRecognitionTime: Date?
 
   init(
@@ -63,12 +63,12 @@ class CameraHandle: NSObject {
   func close() {
     output.setSampleBufferDelegate(nil, queue: nil)
     cameras = []
-    for callback in pendingCaptureCallbacks {
-      callback(nil)
+    for entry in pendingCaptureCallbacks {
+      entry.callback(nil)
     }
     pendingCaptureCallbacks = []
-    for callback in pendingImmediateCaptureCallbacks {
-      callback(nil)
+    for entry in pendingImmediateCaptureCallbacks {
+      entry.callback(nil)
     }
     pendingImmediateCaptureCallbacks = []
 
@@ -82,11 +82,15 @@ class CameraHandle: NSObject {
     setupDevice()
   }
 
-  func captureImage(immediate: Bool, _ callback: @escaping (Data?) -> Void) {
+  func captureImage(
+    immediate: Bool,
+    mirror: Bool,
+    _ callback: @escaping (Data?) -> Void
+  ) {
     if immediate {
-      pendingImmediateCaptureCallbacks.append(callback)
+      pendingImmediateCaptureCallbacks.append((mirror, callback))
     } else {
-      pendingCaptureCallbacks.append(callback)
+      pendingCaptureCallbacks.append((mirror, callback))
     }
     setupDevice()
   }
@@ -186,9 +190,16 @@ class CameraHandle: NSObject {
     let hasCapture = hasStableCapture || hasImmediateCapture
 
     if hasCapture, let image = convertDataToImage(data) {
-      let imageData = image.jpegData(
-        compressionQuality: CameraHandle.captureCompressionQuality
-      )
+      var encodedData: [Bool: Data?] = [:]
+      func capturedData(mirror: Bool) -> Data? {
+        if let cached = encodedData[mirror] { return cached }
+        let source = mirror ? convertDataToImage(data, mirror: true) : image
+        let imageData = source?.jpegData(
+          compressionQuality: CameraHandle.captureCompressionQuality
+        )
+        encodedData[mirror] = imageData
+        return imageData
+      }
 
       var callbacks = pendingImmediateCaptureCallbacks
       pendingImmediateCaptureCallbacks = []
@@ -197,8 +208,9 @@ class CameraHandle: NSObject {
         pendingCaptureCallbacks = []
       }
 
-      for callback in callbacks {
-        Task { callback(imageData) }
+      for entry in callbacks {
+        let imageData = capturedData(mirror: entry.mirror)
+        Task { entry.callback(imageData) }
       }
     }
 
@@ -255,10 +267,14 @@ class CameraHandle: NSObject {
 
   private func convertDataToImage(
     _ data: CVPixelBuffer,
-    scale: CGFloat = 1.0
+    scale: CGFloat = 1.0,
+    mirror: Bool = false
   ) -> UIImage? {
     let transform = CGAffineTransform(scaleX: scale, y: scale)
-    let ciImage = CIImage(cvPixelBuffer: data).transformed(by: transform)
+    var ciImage = CIImage(cvPixelBuffer: data).transformed(by: transform)
+    if mirror {
+      ciImage = ciImage.oriented(forExifOrientation: 2)
+    }
 
     let rect = ciImage.extent.integral
     guard let cg = ciContext.createCGImage(ciImage, from: rect) else {

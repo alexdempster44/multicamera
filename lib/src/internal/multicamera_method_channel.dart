@@ -76,10 +76,11 @@ class MethodChannelMulticamera extends MulticameraPlatform {
   });
 
   @override
-  Future<Uint8List?> captureImage(int id, bool immediate) =>
+  Future<Uint8List?> captureImage(int id, bool immediate, bool mirror) =>
       methodChannel.invokeMethod<Uint8List>('captureImage', {
         'id': id,
         'immediate': immediate,
+        'mirror': mirror,
       });
 
   @override

@@ -59,8 +59,8 @@ class CameraHandle(
     private val handler = Handler(thread.looper)
     private var device: CameraDevice? = null
     private var characteristics: CameraCharacteristics? = null
-    private var pendingCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
-    private var pendingImmediateCaptureCallbacks = mutableListOf<(ByteArray?) -> Unit>()
+    private var pendingCaptureCallbacks = mutableListOf<Pair<Boolean, (ByteArray?) -> Unit>>()
+    private var pendingImmediateCaptureCallbacks = mutableListOf<Pair<Boolean, (ByteArray?) -> Unit>>()
     private var captureImageReader: ImageReader? = null
     private var recognitionImageReader: ImageReader? = null
     private var session: CameraCaptureSession? = null
@@ -115,13 +115,14 @@ class CameraHandle(
 
     fun captureImage(
         immediate: Boolean,
+        mirror: Boolean,
         callback: (ByteArray?) -> Unit,
     ) {
         handler.post {
             if (immediate) {
-                pendingImmediateCaptureCallbacks.add(callback)
+                pendingImmediateCaptureCallbacks.add(mirror to callback)
             } else {
-                pendingCaptureCallbacks.add(callback)
+                pendingCaptureCallbacks.add(mirror to callback)
             }
         }
     }
@@ -169,8 +170,10 @@ class CameraHandle(
                 val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
 
-                val bytesWithExif = addExifOrientation(bytes)
-                for (callback in callbacks) callback(bytesWithExif)
+                val cache = mutableMapOf<Boolean, ByteArray>()
+                for ((mirror, callback) in callbacks) {
+                    callback(cache.getOrPut(mirror) { addExifOrientation(bytes, mirror) })
+                }
             }
 
             image.close()
@@ -294,7 +297,10 @@ class CameraHandle(
         previewFanOut.quarterTurns = quarterTurns
     }
 
-    private fun addExifOrientation(bytes: ByteArray): ByteArray {
+    private fun addExifOrientation(
+        bytes: ByteArray,
+        mirror: Boolean,
+    ): ByteArray {
         val file = File.createTempFile("capture", ".jpg", plugin.context.cacheDir)
         try {
             FileOutputStream(file).use { it.write(bytes) }
@@ -302,10 +308,10 @@ class CameraHandle(
             val exif = ExifInterface(file.absolutePath)
             val exifOrientation =
                 when (quarterTurns % 4) {
-                    1 -> ExifInterface.ORIENTATION_ROTATE_90
-                    2 -> ExifInterface.ORIENTATION_ROTATE_180
-                    3 -> ExifInterface.ORIENTATION_ROTATE_270
-                    else -> ExifInterface.ORIENTATION_NORMAL
+                    1 -> if (mirror) ExifInterface.ORIENTATION_TRANSPOSE else ExifInterface.ORIENTATION_ROTATE_90
+                    2 -> if (mirror) ExifInterface.ORIENTATION_FLIP_VERTICAL else ExifInterface.ORIENTATION_ROTATE_180
+                    3 -> if (mirror) ExifInterface.ORIENTATION_TRANSVERSE else ExifInterface.ORIENTATION_ROTATE_270
+                    else -> if (mirror) ExifInterface.ORIENTATION_FLIP_HORIZONTAL else ExifInterface.ORIENTATION_NORMAL
                 }
             exif.setAttribute(ExifInterface.TAG_ORIENTATION, exifOrientation.toString())
             exif.saveAttributes()
@@ -345,8 +351,8 @@ class CameraHandle(
     }
 
     private fun closeSession() {
-        for (callback in pendingCaptureCallbacks) callback(null)
-        for (callback in pendingImmediateCaptureCallbacks) callback(null)
+        for ((_, callback) in pendingCaptureCallbacks) callback(null)
+        for ((_, callback) in pendingImmediateCaptureCallbacks) callback(null)
         pendingCaptureCallbacks.clear()
         pendingImmediateCaptureCallbacks.clear()
         session?.apply { close() }

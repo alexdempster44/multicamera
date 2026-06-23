@@ -54,6 +54,7 @@ class Registry {
   func captureImage(
     id: Int64,
     immediate: Bool,
+    mirror: Bool,
     _ callback: @escaping (Data?) -> Void
   ) {
     guard let camera = cameras[id] else {
@@ -65,7 +66,7 @@ class Registry {
       return
     }
 
-    handle.captureImage(immediate: immediate, callback)
+    handle.captureImage(immediate: immediate, mirror: mirror, callback)
   }
 
   func unregisterCamera(id: Int64) {

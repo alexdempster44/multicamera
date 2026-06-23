@@ -84,6 +84,7 @@ class MulticameraPlugin :
                 registry.captureImage(
                     call.argument<Long>("id")!!,
                     call.argument<Boolean>("immediate")!!,
+                    call.argument<Boolean>("mirror") ?: false,
                 ) {
                     result.success(it)
                 }

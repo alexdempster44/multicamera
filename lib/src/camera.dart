@@ -184,17 +184,28 @@ class Camera extends ChangeNotifier {
   /// If [immediate] is `true`, the image is captured without waiting for a
   /// stable exposure.
   ///
+  /// If [mirror] is `true`, the captured image is flipped horizontally. Use
+  /// this for front-facing person photos so the saved image matches the
+  /// mirrored preview rather than flipping after capture.
+  ///
   /// The camera must be initialized before calling this method.
   /// If initialization is in progress, this method waits for it to complete.
   ///
   /// Throws [StateError] if the camera has not been initialized.
-  Future<Uint8List?> captureImage({bool immediate = false}) async {
+  Future<Uint8List?> captureImage({
+    bool immediate = false,
+    bool mirror = false,
+  }) async {
     await _ensureInitialized();
 
     final id = _id;
     if (id == null) return null;
 
-    return await MulticameraPlatform.instance.captureImage(id, immediate);
+    return await MulticameraPlatform.instance.captureImage(
+      id,
+      immediate,
+      mirror,
+    );
   }
 
   Future<void> _ensureInitialized() async {
