@@ -1,3 +1,7 @@
+## v1.7.0
+
+- Add `mirror` option to `Camera.captureImage` to horizontally flip the captured image for front-facing person photos
+
 ## v1.6.0
 
 - Require Flutter 3.44.0+ / Dart 3.12.0+
