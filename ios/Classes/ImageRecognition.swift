@@ -1,20 +1,8 @@
-import MLKitBarcodeScanning
-import MLKitFaceDetection
-import MLKitTextRecognition
-import MLKitVision
+import UIKit
+import Vision
 
 struct ImageRecognition {
   private init() {}
-
-  private static let textRecognizer = TextRecognizer.textRecognizer(
-    options: TextRecognizerOptions()
-  )
-  private static let barcodeScanner = BarcodeScanner.barcodeScanner(
-    options: BarcodeScannerOptions()
-  )
-  private static let faceDetector = FaceDetector.faceDetector(
-    options: FaceDetectorOptions()
-  )
 
   static func recognizeImage(
     _ image: UIImage,
@@ -23,32 +11,51 @@ struct ImageRecognition {
     detectFaces: Bool,
     onResults: @escaping (Results) -> Void
   ) {
-    var text: [String]? = nil
+    guard let cgImage = image.cgImage else {
+      onResults(Results(text: nil, barcodes: nil, face: nil))
+      return
+    }
+
+    var requests: [VNRequest] = []
+
+    var textRequest: VNRecognizeTextRequest? = nil
     if recognizeText {
-      do {
-        let visionImage = VisionImage(image: image)
-        let results = try textRecognizer.results(in: visionImage)
-        text = results.blocks.map { $0.text }
-      } catch (_) {}
+      let request = VNRecognizeTextRequest()
+      request.recognitionLevel = .accurate
+      request.usesLanguageCorrection = true
+      requests.append(request)
+      textRequest = request
     }
 
-    var barcodes: [String]? = nil
+    var barcodeRequest: VNDetectBarcodesRequest? = nil
     if scanBarcodes {
-      do {
-        let visionImage = VisionImage(image: image)
-        let results = try barcodeScanner.results(in: visionImage)
-        barcodes = results.compactMap { $0.rawValue }
-      } catch (_) {}
+      let request = VNDetectBarcodesRequest()
+      requests.append(request)
+      barcodeRequest = request
     }
 
-    var face: Bool? = nil
+    var faceRequest: VNDetectFaceRectanglesRequest? = nil
     if detectFaces {
-      do {
-        let visionImage = VisionImage(image: image)
-        let results = try faceDetector.results(in: visionImage)
-        face = !results.isEmpty
-      } catch (_) {}
+      let request = VNDetectFaceRectanglesRequest()
+      requests.append(request)
+      faceRequest = request
     }
+
+    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+    do {
+      try handler.perform(requests)
+    } catch {
+      onResults(Results(text: nil, barcodes: nil, face: nil))
+      return
+    }
+
+    let text = textRequest.map { request in
+      (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+    }
+    let barcodes = barcodeRequest.map { request in
+      (request.results ?? []).compactMap { $0.payloadStringValue }
+    }
+    let face = faceRequest.map { !($0.results ?? []).isEmpty }
 
     onResults(
       Results(

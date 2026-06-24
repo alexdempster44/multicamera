@@ -9,14 +9,14 @@
 [![GitHub issues](https://img.shields.io/github/issues/alexdempster44/multicamera)](https://github.com/alexdempster44/multicamera/issues)
 [![GitHub pulls](https://img.shields.io/github/issues-pr/alexdempster44/multicamera)](https://github.com/alexdempster44/multicamera/pulls)
 
-A Flutter plugin for managing multiple camera instances simultaneously with built-in ML kit support.
+A Flutter plugin for managing multiple camera instances simultaneously with built-in recognition support.
 
 ## Features
 
 - **Multiple simultaneous cameras** - Run multiple camera instances at the same time
 - **Image capture** - Capture images from any camera instance
 - **Front/Back camera support** - Easy switching between camera directions
-- **Text recognition** - Real-time text recognition using MLKit
+- **Text recognition** - Real-time on-device text recognition
 - **Barcode scanning** - Detect and scan various barcode formats
 - **Face detection** - Real-time face detection capabilities
 - **Cross-platform** - Supports both iOS and Android
