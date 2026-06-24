@@ -1,3 +1,9 @@
+## v1.8.0
+
+- (iOS) Replace Google MLKit with Apple's on-device Vision framework for text recognition, barcode scanning, and face detection, removing all third-party ML dependencies
+- (iOS) Add Swift Package Manager support
+- (iOS) Lower minimum platform version to 13.0
+
 ## v1.7.0
 
 - Add `mirror` option to `Camera.captureImage` to horizontally flip the captured image for front-facing person photos
