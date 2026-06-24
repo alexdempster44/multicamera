@@ -64,7 +64,7 @@ jobs:
         run: brew install swift-format
 
       - name: Lint
-        run: swift-format lint --strict --recursive ios/Classes
+        run: swift-format lint --strict --recursive ios/multicamera/Sources
 
   build-android:
     name: Build Android
@@ -93,8 +93,12 @@ jobs:
         run: cd example && flutter build apk --release
 
   build-ios:
-    name: Build iOS
+    name: Build iOS (${{ matrix.dependency-manager }})
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dependency-manager: [CocoaPods, SwiftPM]
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -105,6 +109,10 @@ jobs:
           flutter-version: 3.44.2
           channel: stable
           cache: true
+
+      - name: Enable Swift Package Manager
+        if: matrix.dependency-manager == 'SwiftPM'
+        run: flutter config --enable-swift-package-manager
 
       - name: Install dependencies
         run: cd example && flutter pub get
