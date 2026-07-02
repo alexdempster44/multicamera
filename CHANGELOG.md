@@ -1,3 +1,8 @@
+## v1.9.0
+
+- (iOS) Use camera output metadata for barcode and face detection for improved efficiency
+- (Android) Use camera stream configuration maps to scale recognition coordinates when available
+
 ## v1.8.0
 
 - (iOS) Replace Google MLKit with Apple's on-device Vision framework for text recognition, barcode scanning, and face detection, removing all third-party ML dependencies
