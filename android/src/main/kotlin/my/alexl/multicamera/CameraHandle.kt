@@ -25,6 +25,7 @@ import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import kotlin.math.abs
 
 @SuppressLint("MissingPermission")
 class CameraHandle(
@@ -182,10 +183,11 @@ class CameraHandle(
         }, handler)
         this.captureImageReader = captureImageReader
 
+        val recognitionSize = recognitionSize()
         val recognitionImageReader =
             ImageReader.newInstance(
-                (size.width * 0.2).toInt(),
-                (size.height * 0.2).toInt(),
+                recognitionSize.width,
+                recognitionSize.height,
                 ImageFormat.YUV_420_888,
                 2,
             )
@@ -271,6 +273,32 @@ class CameraHandle(
                 it.surface
             },
         )
+    }
+
+    private fun recognitionSize(): Size {
+        val default =
+            Size(
+                (size.width * 0.2).toInt().coerceAtLeast(1),
+                (size.height * 0.2).toInt().coerceAtLeast(1),
+            )
+        val streamConfigurationMap =
+            characteristics?.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+                ?: return default
+        val yuvSizes =
+            streamConfigurationMap
+                .getOutputSizes(ImageFormat.YUV_420_888)
+                ?.filter { it.width <= 1920 && it.height <= 1080 }
+                ?.takeIf { it.isNotEmpty() }
+                ?: return default
+
+        val previewAspect = size.width.toFloat() / size.height
+        val matching =
+            yuvSizes.filter {
+                abs(it.width.toFloat() / it.height - previewAspect) < 0.05f
+            }
+
+        return (matching.takeIf { it.isNotEmpty() } ?: yuvSizes)
+            .maxBy { it.width * it.height }
     }
 
     private fun calculateQuarterTurns() {
