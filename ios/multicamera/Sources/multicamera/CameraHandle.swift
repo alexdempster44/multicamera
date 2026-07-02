@@ -5,7 +5,9 @@ import UIKit
 class CameraHandle: NSObject {
   let direction: Camera.Direction
   let onCameraUpdated: (() -> Void)
-  let onRecognitionImage: ((UIImage) -> Void)
+  let onTextImage: ((UIImage) -> Void)
+  let onBarcodes: (([String]) -> Void)
+  let onFace: ((Bool) -> Void)
   private(set) var size: (Int32, Int32) = (1, 1)
   private(set) var quarterTurns: Int32 = 1
 
@@ -24,25 +26,33 @@ class CameraHandle: NSObject {
 
   private static let captureCompressionQuality: CGFloat = 0.8
   private static let recognitionThrottleInterval: TimeInterval = 0.2
-  private static let recognitionImageScale: CGFloat = 0.2
   private static let stableExposureOffset: Float = 0.5
 
   private let output = AVCaptureVideoDataOutput()
+  private let metadataOutput = AVCaptureMetadataOutput()
   private let queue: DispatchQueue
   private let ciContext = CIContext()
   private var cameras: [Camera] = []
   private var pendingCaptureCallbacks: [(mirror: Bool, callback: (Data?) -> Void)] = []
   private var pendingImmediateCaptureCallbacks: [(mirror: Bool, callback: (Data?) -> Void)] = []
   private var lastRecognitionTime: Date?
+  private var recognizeText = false
+  private var scanBarcodes = false
+  private var detectFaces = false
+  private var lastFace: Bool?
 
   init(
     direction: Camera.Direction,
     onCameraUpdated: @escaping (() -> Void),
-    onRecognitionImage: @escaping ((UIImage) -> Void)
+    onTextImage: @escaping ((UIImage) -> Void),
+    onBarcodes: @escaping (([String]) -> Void),
+    onFace: @escaping ((Bool) -> Void)
   ) {
     self.direction = direction
     self.onCameraUpdated = onCameraUpdated
-    self.onRecognitionImage = onRecognitionImage
+    self.onTextImage = onTextImage
+    self.onBarcodes = onBarcodes
+    self.onFace = onFace
     self.queue = DispatchQueue(
       label: "my.alexl.multicamera.\(direction)",
       qos: .userInitiated
@@ -80,6 +90,32 @@ class CameraHandle: NSObject {
   func setCameras(_ cameras: [Camera]) {
     self.cameras = cameras
     setupDevice()
+  }
+
+  func updateRecognition(
+    recognizeText: Bool,
+    scanBarcodes: Bool,
+    detectFaces: Bool
+  ) {
+    self.recognizeText = recognizeText
+    self.scanBarcodes = scanBarcodes
+    self.detectFaces = detectFaces
+    self.lastFace = nil
+    Self.sessionQueue.async { [weak self] in self?.applyMetadataTypes() }
+  }
+
+  private func applyMetadataTypes() {
+    guard device != nil else { return }
+
+    let available = metadataOutput.availableMetadataObjectTypes
+    var types: [AVMetadataObject.ObjectType] = []
+    if scanBarcodes {
+      types += available.filter { $0 != .face }
+    }
+    if detectFaces, available.contains(.face) {
+      types.append(.face)
+    }
+    metadataOutput.metadataObjectTypes = types
   }
 
   func captureImage(
@@ -139,6 +175,8 @@ class CameraHandle: NSObject {
     }
     Self.session.addOutput(output)
 
+    addMetadataOutput(for: input)
+
     Self.session.commitConfiguration()
 
     self.device = device
@@ -150,7 +188,27 @@ class CameraHandle: NSObject {
     let dimensions = device.activeFormat.formatDescription.dimensions
     size = (dimensions.width, dimensions.height)
 
+    applyMetadataTypes()
     handleOrientationChange()
+  }
+
+  private func addMetadataOutput(for input: AVCaptureDeviceInput) {
+    guard Self.session.canAddOutput(metadataOutput) else { return }
+    Self.session.addOutputWithNoConnections(metadataOutput)
+    metadataOutput.setMetadataObjectsDelegate(self, queue: queue)
+
+    let ports = input.ports(
+      for: .metadataObject,
+      sourceDeviceType: input.device.deviceType,
+      sourceDevicePosition: input.device.position
+    )
+    guard let port = ports.first else { return }
+    let connection = AVCaptureConnection(
+      inputPorts: [port],
+      output: metadataOutput
+    )
+    guard Self.session.canAddConnection(connection) else { return }
+    Self.session.addConnection(connection)
   }
 
   private func selectDevice() -> AVCaptureDevice? {
@@ -214,18 +272,17 @@ class CameraHandle: NSObject {
       }
     }
 
+    guard recognizeText else { return }
+
     let now = Date()
     let elapsed = now.timeIntervalSince(
       lastRecognitionTime ?? Date.distantPast
     )
 
     if elapsed < Self.recognitionThrottleInterval { return }
-    if let image = convertDataToImage(
-      data,
-      scale: Self.recognitionImageScale
-    ) {
+    if let image = convertDataToImage(data) {
       self.lastRecognitionTime = now
-      Task { onRecognitionImage(image) }
+      Task { onTextImage(image) }
     }
   }
 
@@ -267,11 +324,9 @@ class CameraHandle: NSObject {
 
   private func convertDataToImage(
     _ data: CVPixelBuffer,
-    scale: CGFloat = 1.0,
     mirror: Bool = false
   ) -> UIImage? {
-    let transform = CGAffineTransform(scaleX: scale, y: scale)
-    var ciImage = CIImage(cvPixelBuffer: data).transformed(by: transform)
+    var ciImage = CIImage(cvPixelBuffer: data)
     if mirror {
       ciImage = ciImage.oriented(forExifOrientation: 2)
     }
@@ -322,6 +377,9 @@ class CameraHandle: NSObject {
 
     Self.session.beginConfiguration()
     Self.session.removeOutput(output)
+    if Self.session.outputs.contains(metadataOutput) {
+      Self.session.removeOutput(metadataOutput)
+    }
 
     for input in Self.session.inputs {
       guard let deviceInput = input as? AVCaptureDeviceInput else {
@@ -351,5 +409,27 @@ extension CameraHandle: AVCaptureVideoDataOutputSampleBufferDelegate {
       return
     }
     onPixelBuffer(data)
+  }
+}
+
+extension CameraHandle: AVCaptureMetadataOutputObjectsDelegate {
+  func metadataOutput(
+    _ output: AVCaptureMetadataOutput,
+    didOutput metadataObjects: [AVMetadataObject],
+    from connection: AVCaptureConnection
+  ) {
+    if scanBarcodes {
+      let barcodes = metadataObjects.compactMap {
+        ($0 as? AVMetadataMachineReadableCodeObject)?.stringValue
+      }
+      onBarcodes(barcodes)
+    }
+    if detectFaces {
+      let hasFace = metadataObjects.contains { $0.type == .face }
+      if hasFace != lastFace {
+        lastFace = hasFace
+        onFace(hasFace)
+      }
+    }
   }
 }

@@ -93,8 +93,15 @@ class Registry {
       let cameras = cameras.values.filter { $0.direction == direction }
       guard !cameras.isEmpty else { continue }
 
-      (cameraHandles[direction] ?? createHandle(direction: direction))
-        .setCameras(cameras.filter { !$0.paused })
+      let active = cameras.filter { !$0.paused }
+      let handle =
+        cameraHandles[direction] ?? createHandle(direction: direction)
+      handle.setCameras(active)
+      handle.updateRecognition(
+        recognizeText: active.contains { $0.recognizeText },
+        scanBarcodes: active.contains { $0.scanBarcodes },
+        detectFaces: active.contains { $0.detectFaces }
+      )
     }
 
     for direction in Camera.Direction.allCases {
@@ -108,8 +115,14 @@ class Registry {
       onCameraUpdated: { [weak self] in
         self?.updateFlutterCameras(direction)
       },
-      onRecognitionImage: { [weak self] image in
-        self?.onRecognitionImage(image, direction: direction)
+      onTextImage: { [weak self] image in
+        self?.onTextImage(image, direction: direction)
+      },
+      onBarcodes: { [weak self] barcodes in
+        self?.sendRecognitionResults(direction, ["barcodes": barcodes])
+      },
+      onFace: { [weak self] face in
+        self?.sendRecognitionResults(direction, ["face": face])
       }
     )
 
@@ -144,44 +157,35 @@ class Registry {
     }
   }
 
-  private func onRecognitionImage(
+  private func onTextImage(
     _ image: UIImage,
     direction: Camera.Direction
+  ) {
+    ImageRecognition.recognizeText(
+      image,
+      onResult: { [weak self] text in
+        guard let text = text else { return }
+        self?.sendRecognitionResults(direction, ["text": text])
+      }
+    )
+  }
+
+  private func sendRecognitionResults(
+    _ direction: Camera.Direction,
+    _ results: [String: Any]
   ) {
     let cameras = cameras.values.filter {
       $0.direction == direction && !$0.paused
     }
 
-    let recognizeText = cameras.contains { $0.recognizeText }
-    let scanBarcodes = cameras.contains { $0.scanBarcodes }
-    let detectFaces = cameras.contains { $0.detectFaces }
-
-    ImageRecognition.recognizeImage(
-      image,
-      recognizeText: recognizeText,
-      scanBarcodes: scanBarcodes,
-      detectFaces: detectFaces,
-      onResults: { [weak self] results in
-        guard let self = self else { return }
-        let cameras = self.cameras.values.filter {
-          $0.direction == direction && !$0.paused
-        }
-
-        for camera in cameras {
-          guard let id = camera.id else { continue }
-          DispatchQueue.main.async {
-            self.plugin.channel.invokeMethod(
-              "recognitionResults",
-              arguments: [
-                "id": id,
-                "text": results.text as Any,
-                "barcodes": results.barcodes as Any,
-                "face": results.face as Any,
-              ]
-            )
-          }
-        }
+    for camera in cameras {
+      guard let id = camera.id else { continue }
+      DispatchQueue.main.async {
+        self.plugin.channel.invokeMethod(
+          "recognitionResults",
+          arguments: results.merging(["id": id]) { current, _ in current }
+        )
       }
-    )
+    }
   }
 }
