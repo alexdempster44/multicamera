@@ -1,3 +1,7 @@
+## v1.10.0
+
+- (iOS) Render a debug placeholder frame on the simulator, which has no camera hardware, instead of attempting to open the camera stream
+
 ## v1.9.0
 
 - (iOS) Use camera output metadata for barcode and face detection for improved efficiency
