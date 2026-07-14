@@ -147,6 +147,11 @@ class CameraHandle: NSObject {
   private func createDevice() {
     if device != nil { return }
 
+    #if targetEnvironment(simulator)
+      showSimulatorWarning()
+      return
+    #endif
+
     Self.session.beginConfiguration()
 
     guard let device = selectDevice() else {
@@ -251,7 +256,8 @@ class CameraHandle: NSObject {
       var encodedData: [Bool: Data?] = [:]
       func capturedData(mirror: Bool) -> Data? {
         if let cached = encodedData[mirror] { return cached }
-        let source = mirror ? convertDataToImage(data, mirror: true) : image
+        let source =
+          mirror ? convertDataToImage(data, mirror: true) : image
         let imageData = source?.jpegData(
           compressionQuality: CameraHandle.captureCompressionQuality
         )
@@ -397,6 +403,34 @@ class CameraHandle: NSObject {
       Self.session.stopRunning()
     }
   }
+
+  #if targetEnvironment(simulator)
+    private func showSimulatorWarning() {
+      if let buffer = SimulatorWarning.pixelBuffer(for: direction) {
+        size = (
+          Int32(CVPixelBufferGetWidth(buffer)),
+          Int32(CVPixelBufferGetHeight(buffer))
+        )
+        quarterTurns = 0
+
+        for camera in cameras {
+          camera.updateFrame(buffer)
+        }
+        onCameraUpdated()
+      }
+
+      let callbacks =
+        pendingImmediateCaptureCallbacks + pendingCaptureCallbacks
+      pendingImmediateCaptureCallbacks = []
+      pendingCaptureCallbacks = []
+      guard !callbacks.isEmpty else { return }
+
+      let data = SimulatorWarning.imageData(for: direction)
+      for entry in callbacks {
+        entry.callback(data)
+      }
+    }
+  #endif
 }
 
 extension CameraHandle: AVCaptureVideoDataOutputSampleBufferDelegate {
