@@ -22,6 +22,7 @@ class _CameraViewState extends State<CameraView> {
   List<String>? text;
   List<String>? barcodes;
   bool? face;
+  bool playSound = false;
 
   @override
   void initState() {
@@ -72,7 +73,9 @@ class _CameraViewState extends State<CameraView> {
                   IconButton.filled(
                     icon: Icon(Icons.camera),
                     onPressed: () async {
-                      final image = await camera.captureImage();
+                      final image = await camera.captureImage(
+                        playSound: playSound,
+                      );
                       if (!mounted || image == null) return;
 
                       widget.onCapture(image);
@@ -81,7 +84,10 @@ class _CameraViewState extends State<CameraView> {
                   IconButton.outlined(
                     icon: Icon(Icons.camera_outlined),
                     onPressed: () async {
-                      final image = await camera.captureImage(immediate: true);
+                      final image = await camera.captureImage(
+                        immediate: true,
+                        playSound: playSound,
+                      );
                       if (!mounted || image == null) return;
 
                       widget.onCapture(image);
@@ -103,6 +109,20 @@ class _CameraViewState extends State<CameraView> {
                   Switch(
                     value: camera.paused,
                     onChanged: (value) => camera.paused = value,
+                  ),
+                ],
+              ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                spacing: 16,
+                children: [
+                  Text(
+                    'Play sound:',
+                    style: TextStyle(fontSize: 20),
+                  ),
+                  Switch(
+                    value: playSound,
+                    onChanged: (value) => setState(() => playSound = value),
                   ),
                 ],
               ),

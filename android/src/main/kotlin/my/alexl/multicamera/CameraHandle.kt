@@ -12,8 +12,10 @@ import android.hardware.camera2.CameraManager
 import android.hardware.camera2.CaptureRequest
 import android.hardware.camera2.CaptureResult
 import android.hardware.camera2.TotalCaptureResult
+import android.media.AudioManager
 import android.media.Image
 import android.media.ImageReader
+import android.media.MediaActionSound
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Size
@@ -39,6 +41,12 @@ class CameraHandle(
         private const val REOPEN_DELAY_MS = 1000L
     }
 
+    private data class PendingCapture(
+        val mirror: Boolean,
+        val playSound: Boolean,
+        val callback: (ByteArray?) -> Unit,
+    )
+
     var surfaceProducers = listOf<TextureRegistry.SurfaceProducer>()
         set(value) {
             field = value
@@ -60,8 +68,8 @@ class CameraHandle(
     private val handler = Handler(thread.looper)
     private var device: CameraDevice? = null
     private var characteristics: CameraCharacteristics? = null
-    private var pendingCaptureCallbacks = mutableListOf<Pair<Boolean, (ByteArray?) -> Unit>>()
-    private var pendingImmediateCaptureCallbacks = mutableListOf<Pair<Boolean, (ByteArray?) -> Unit>>()
+    private var pendingCaptureCallbacks = mutableListOf<PendingCapture>()
+    private var pendingImmediateCaptureCallbacks = mutableListOf<PendingCapture>()
     private var captureImageReader: ImageReader? = null
     private var recognitionImageReader: ImageReader? = null
     private var session: CameraCaptureSession? = null
@@ -69,6 +77,7 @@ class CameraHandle(
     private var exposureLevelled = false
     private var recognitionBusy = false
     private var closeRequested = false
+    private var shutterSound: MediaActionSound? = null
 
     private val captureCallback =
         object : CameraCaptureSession.CaptureCallback() {
@@ -117,13 +126,15 @@ class CameraHandle(
     fun captureImage(
         immediate: Boolean,
         mirror: Boolean,
+        playSound: Boolean,
         callback: (ByteArray?) -> Unit,
     ) {
         handler.post {
+            val pending = PendingCapture(mirror, playSound, callback)
             if (immediate) {
-                pendingImmediateCaptureCallbacks.add(mirror to callback)
+                pendingImmediateCaptureCallbacks.add(pending)
             } else {
-                pendingCaptureCallbacks.add(mirror to callback)
+                pendingCaptureCallbacks.add(pending)
             }
         }
     }
@@ -167,13 +178,21 @@ class CameraHandle(
             }
 
             if (callbacks.isNotEmpty()) {
+                if (callbacks.any { it.playSound }) {
+                    playShutterSound()
+                }
+
                 val buffer = image.planes[0].buffer
                 val bytes = ByteArray(buffer.remaining())
                 buffer.get(bytes)
 
                 val cache = mutableMapOf<Boolean, ByteArray>()
-                for ((mirror, callback) in callbacks) {
-                    callback(cache.getOrPut(mirror) { addExifOrientation(bytes, mirror) })
+                for (pending in callbacks) {
+                    pending.callback(
+                        cache.getOrPut(pending.mirror) {
+                            addExifOrientation(bytes, pending.mirror)
+                        },
+                    )
                 }
             }
 
@@ -226,6 +245,17 @@ class CameraHandle(
             },
             handler,
         )
+    }
+
+    private fun playShutterSound() {
+        val audioManager = plugin.context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
+
+        val sound =
+            shutterSound ?: MediaActionSound()
+                .apply { load(MediaActionSound.SHUTTER_CLICK) }
+                .also { shutterSound = it }
+        sound.play(MediaActionSound.SHUTTER_CLICK)
     }
 
     @RequiresPermission(Manifest.permission.CAMERA)
@@ -379,8 +409,8 @@ class CameraHandle(
     }
 
     private fun closeSession() {
-        for ((_, callback) in pendingCaptureCallbacks) callback(null)
-        for ((_, callback) in pendingImmediateCaptureCallbacks) callback(null)
+        for (pending in pendingCaptureCallbacks) pending.callback(null)
+        for (pending in pendingImmediateCaptureCallbacks) pending.callback(null)
         pendingCaptureCallbacks.clear()
         pendingImmediateCaptureCallbacks.clear()
         session?.apply { close() }
@@ -435,5 +465,6 @@ class CameraHandle(
         thread.quitSafely()
         thread.join()
         previewFanOut.close()
+        shutterSound?.release()
     }
 }

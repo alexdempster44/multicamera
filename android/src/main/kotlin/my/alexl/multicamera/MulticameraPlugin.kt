@@ -85,6 +85,7 @@ class MulticameraPlugin :
                     call.argument<Long>("id")!!,
                     call.argument<Boolean>("immediate")!!,
                     call.argument<Boolean>("mirror") ?: false,
+                    call.argument<Boolean>("playSound") ?: false,
                 ) {
                     result.success(it)
                 }

@@ -55,6 +55,7 @@ class Registry {
     id: Int64,
     immediate: Bool,
     mirror: Bool,
+    playSound: Bool,
     _ callback: @escaping (Data?) -> Void
   ) {
     guard let camera = cameras[id] else {
@@ -66,7 +67,12 @@ class Registry {
       return
     }
 
-    handle.captureImage(immediate: immediate, mirror: mirror, callback)
+    handle.captureImage(
+      immediate: immediate,
+      mirror: mirror,
+      playSound: playSound,
+      callback
+    )
   }
 
   func unregisterCamera(id: Int64) {

@@ -188,6 +188,9 @@ class Camera extends ChangeNotifier {
   /// this for front-facing person photos so the saved image matches the
   /// mirrored preview rather than flipping after capture.
   ///
+  /// If [playSound] is `true`, a system shutter sound is played at the moment
+  /// the frame is captured.
+  ///
   /// The camera must be initialized before calling this method.
   /// If initialization is in progress, this method waits for it to complete.
   ///
@@ -195,6 +198,7 @@ class Camera extends ChangeNotifier {
   Future<Uint8List?> captureImage({
     bool immediate = false,
     bool mirror = false,
+    bool playSound = false,
   }) async {
     await _ensureInitialized();
 
@@ -205,6 +209,7 @@ class Camera extends ChangeNotifier {
       id,
       immediate,
       mirror,
+      playSound,
     );
   }
 

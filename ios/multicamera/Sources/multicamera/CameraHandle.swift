@@ -1,4 +1,5 @@
 import AVFoundation
+import AudioToolbox
 import Flutter
 import UIKit
 
@@ -28,13 +29,17 @@ class CameraHandle: NSObject {
   private static let recognitionThrottleInterval: TimeInterval = 0.2
   private static let stableExposureOffset: Float = 0.5
 
+  private static let shutterSoundID: SystemSoundID = 1108
+
   private let output = AVCaptureVideoDataOutput()
   private let metadataOutput = AVCaptureMetadataOutput()
   private let queue: DispatchQueue
   private let ciContext = CIContext()
   private var cameras: [Camera] = []
-  private var pendingCaptureCallbacks: [(mirror: Bool, callback: (Data?) -> Void)] = []
-  private var pendingImmediateCaptureCallbacks: [(mirror: Bool, callback: (Data?) -> Void)] = []
+  private var pendingCaptureCallbacks:
+    [(mirror: Bool, playSound: Bool, callback: (Data?) -> Void)] = []
+  private var pendingImmediateCaptureCallbacks:
+    [(mirror: Bool, playSound: Bool, callback: (Data?) -> Void)] = []
   private var lastRecognitionTime: Date?
   private var recognizeText = false
   private var scanBarcodes = false
@@ -121,12 +126,13 @@ class CameraHandle: NSObject {
   func captureImage(
     immediate: Bool,
     mirror: Bool,
+    playSound: Bool,
     _ callback: @escaping (Data?) -> Void
   ) {
     if immediate {
-      pendingImmediateCaptureCallbacks.append((mirror, callback))
+      pendingImmediateCaptureCallbacks.append((mirror, playSound, callback))
     } else {
-      pendingCaptureCallbacks.append((mirror, callback))
+      pendingCaptureCallbacks.append((mirror, playSound, callback))
     }
     setupDevice()
   }
@@ -270,6 +276,10 @@ class CameraHandle: NSObject {
       if exposureStable {
         callbacks += pendingCaptureCallbacks
         pendingCaptureCallbacks = []
+      }
+
+      if callbacks.contains(where: { $0.playSound }) {
+        AudioServicesPlaySystemSound(Self.shutterSoundID)
       }
 
       for entry in callbacks {
