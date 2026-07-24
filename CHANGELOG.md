@@ -1,3 +1,7 @@
+## v1.11.0
+
+- Add a `playSound` option to `Camera.captureImage` to play the system shutter sound when capturing
+
 ## v1.10.0
 
 - (iOS) Render a debug placeholder frame on the simulator, which has no camera hardware, instead of attempting to open the camera stream
