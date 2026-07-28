@@ -152,31 +152,23 @@ class CameraHandle: NSObject {
 
   private func createDevice() {
     if device != nil { return }
+    if openDevice() { return }
 
     #if targetEnvironment(simulator)
-      if selectDevice() == nil {
-        showSimulatorWarning()
-        return
-      }
+      showSimulatorWarning()
     #endif
+  }
+
+  private func openDevice() -> Bool {
+    guard let device = selectDevice() else { return false }
 
     Self.session.beginConfiguration()
 
-    guard let device = selectDevice() else {
+    guard let input = try? AVCaptureDeviceInput(device: device),
+      Self.session.canAddInput(input)
+    else {
       Self.session.commitConfiguration()
-      return
-    }
-
-    let input: AVCaptureDeviceInput
-    do {
-      input = try AVCaptureDeviceInput(device: device)
-    } catch {
-      Self.session.commitConfiguration()
-      return
-    }
-    guard Self.session.canAddInput(input) else {
-      Self.session.commitConfiguration()
-      return
+      return false
     }
     Self.session.addInput(input)
 
@@ -184,7 +176,7 @@ class CameraHandle: NSObject {
     output.setSampleBufferDelegate(self, queue: queue)
     guard Self.session.canAddOutput(output) else {
       Self.session.commitConfiguration()
-      return
+      return false
     }
     Self.session.addOutput(output)
 
@@ -203,6 +195,8 @@ class CameraHandle: NSObject {
 
     applyMetadataTypes()
     handleOrientationChange()
+
+    return true
   }
 
   private func addMetadataOutput(for input: AVCaptureDeviceInput) {
