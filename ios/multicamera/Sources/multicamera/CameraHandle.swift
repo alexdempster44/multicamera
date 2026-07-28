@@ -154,10 +154,6 @@ class CameraHandle: NSObject {
     if device != nil { return }
 
     #if targetEnvironment(simulator)
-      // The simulator has no camera hardware, but a camera-injection tool
-      // (sim-cli/Iris, SimulatorCamera) can publish one that AVFoundation
-      // discovers normally. Only fall back to the placeholder frame when
-      // discovery really comes up empty, so an injected feed reaches the app.
       if selectDevice() == nil {
         showSimulatorWarning()
         return
