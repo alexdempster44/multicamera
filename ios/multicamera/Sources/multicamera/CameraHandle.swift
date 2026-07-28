@@ -154,8 +154,10 @@ class CameraHandle: NSObject {
     if device != nil { return }
 
     #if targetEnvironment(simulator)
-      showSimulatorWarning()
-      return
+      if selectDevice() == nil {
+        showSimulatorWarning()
+        return
+      }
     #endif
 
     Self.session.beginConfiguration()
