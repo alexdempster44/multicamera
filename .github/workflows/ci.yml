@@ -119,3 +119,6 @@ jobs:
 
       - name: Build iOS
         run: cd example && flutter build ios --release --no-codesign
+
+      - name: Build iOS simulator
+        run: cd example && flutter build ios --debug --simulator
