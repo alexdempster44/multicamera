@@ -142,15 +142,11 @@ class Registry {
       $0.direction == direction && !$0.paused
     }
 
-    var width = handle.size.0
-    var height = handle.size.1
-    if handle.quarterTurns % 2 == 1 {
-      swap(&width, &height)
-    }
+    guard let (width, height) = handle.size else { return }
 
     for camera in cameras {
       guard let id = camera.id else { continue }
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+      DispatchQueue.main.async {
         self.plugin.channel.invokeMethod(
           "updateCamera",
           arguments: [

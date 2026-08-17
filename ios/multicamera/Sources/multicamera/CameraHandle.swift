@@ -9,8 +9,12 @@ class CameraHandle: NSObject {
   let onTextImage: ((UIImage) -> Void)
   let onBarcodes: (([String]) -> Void)
   let onFace: ((Bool) -> Void)
-  private(set) var size: (Int32, Int32) = (1, 1)
-  private(set) var quarterTurns: Int32 = 1
+
+  var size: (Int32, Int32)? {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    return currentSize
+  }
 
   private static let session: AVCaptureSession = {
     if AVCaptureMultiCamSession.isMultiCamSupported {
@@ -24,6 +28,16 @@ class CameraHandle: NSObject {
   )
   private static var referenceCount = 0
   private var device: AVCaptureDevice?
+
+  private let stateLock = NSLock()
+  private var currentSize: (Int32, Int32)?
+  private var currentQuarterTurns: Int32 = 1
+
+  private var quarterTurns: Int32 {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    return currentQuarterTurns
+  }
 
   private static let captureCompressionQuality: CGFloat = 0.8
   private static let recognitionThrottleInterval: TimeInterval = 0.2
@@ -63,6 +77,10 @@ class CameraHandle: NSObject {
       qos: .userInitiated
     )
     super.init()
+
+    if let quarterTurns = interfaceQuarterTurns() {
+      currentQuarterTurns = quarterTurns
+    }
 
     UIDevice.current.beginGeneratingDeviceOrientationNotifications()
     NotificationCenter.default.addObserver(
@@ -190,11 +208,7 @@ class CameraHandle: NSObject {
       Self.session.startRunning()
     }
 
-    let dimensions = device.activeFormat.formatDescription.dimensions
-    size = (dimensions.width, dimensions.height)
-
     applyMetadataTypes()
-    handleOrientationChange()
 
     return true
   }
@@ -247,6 +261,8 @@ class CameraHandle: NSObject {
       camera.updateFrame(data)
     }
 
+    updateSize(data)
+
     let exposureStable = exposureStable()
 
     let hasStableCapture =
@@ -296,6 +312,19 @@ class CameraHandle: NSObject {
       self.lastRecognitionTime = now
       Task { onTextImage(image) }
     }
+  }
+
+  private func updateSize(_ data: CVPixelBuffer) {
+    let width = Int32(CVPixelBufferGetWidth(data))
+    let height = Int32(CVPixelBufferGetHeight(data))
+
+    stateLock.lock()
+    let changed = currentSize?.0 != width || currentSize?.1 != height
+    currentSize = (width, height)
+    stateLock.unlock()
+
+    guard changed else { return }
+    DispatchQueue.main.async { [self] in onCameraUpdated() }
   }
 
   private func rotatePixelBuffer(
@@ -359,29 +388,35 @@ class CameraHandle: NSObject {
 
   @objc private func handleOrientationChange() {
     DispatchQueue.main.async { [self] in
-      let windowScene =
-        UIApplication.shared.connectedScenes.first as? UIWindowScene
+      guard let quarterTurns = interfaceQuarterTurns() else { return }
 
-      guard let interfaceOrientation = windowScene?.interfaceOrientation
-      else { return }
-
-      let quarterTurns: Int32? =
-        switch interfaceOrientation {
-        case .landscapeRight: 0
-        case .portrait: 1
-        case .landscapeLeft: 2
-        case .portraitUpsideDown: 3
-        default: nil
-        }
-      guard let quarterTurns = quarterTurns else { return }
-
-      let isLandscape = interfaceOrientation.isLandscape
-      let adjustment: Int32 =
-        (self.direction == .front && isLandscape) ? 2 : 0
-
-      self.quarterTurns = (quarterTurns + adjustment) % 4
-      self.onCameraUpdated()
+      stateLock.lock()
+      currentQuarterTurns = quarterTurns
+      stateLock.unlock()
     }
+  }
+
+  private func interfaceQuarterTurns() -> Int32? {
+    let windowScene =
+      UIApplication.shared.connectedScenes.first as? UIWindowScene
+
+    guard let interfaceOrientation = windowScene?.interfaceOrientation
+    else { return nil }
+
+    let quarterTurns: Int32? =
+      switch interfaceOrientation {
+      case .landscapeRight: 0
+      case .portrait: 1
+      case .landscapeLeft: 2
+      case .portraitUpsideDown: 3
+      default: nil
+      }
+    guard let quarterTurns = quarterTurns else { return nil }
+
+    let isLandscape = interfaceOrientation.isLandscape
+    let adjustment: Int32 = (direction == .front && isLandscape) ? 2 : 0
+
+    return (quarterTurns + adjustment) % 4
   }
 
   private func closeDevice() {
@@ -413,16 +448,11 @@ class CameraHandle: NSObject {
   #if targetEnvironment(simulator)
     private func showSimulatorWarning() {
       if let buffer = SimulatorWarning.pixelBuffer(for: direction) {
-        size = (
-          Int32(CVPixelBufferGetWidth(buffer)),
-          Int32(CVPixelBufferGetHeight(buffer))
-        )
-        quarterTurns = 0
-
         for camera in cameras {
           camera.updateFrame(buffer)
         }
-        onCameraUpdated()
+
+        updateSize(buffer)
       }
 
       let callbacks =

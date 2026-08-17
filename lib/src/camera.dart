@@ -37,7 +37,7 @@ class Camera extends ChangeNotifier {
   TextRecognizedCallback? _onTextRecognized;
   BarcodesScannedCallback? _onBarcodesScanned;
   FaceDetectedCallback? _onFaceDetected;
-  (int, int) _size = (1, 1);
+  (int, int)? _size;
 
   /// Whether the camera has been initialized and is ready to use.
   ///
@@ -99,8 +99,8 @@ class Camera extends ChangeNotifier {
 
   /// The size of the camera preview in pixels as `(width, height)`.
   ///
-  /// Returns `(1, 1)` if the camera has not been initialized yet.
-  (int, int) get size => _size;
+  /// Returns `null` until the preview size is known.
+  (int, int)? get size => _size;
 
   /// Creates a new [Camera] instance.
   ///

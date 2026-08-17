@@ -80,13 +80,23 @@ class _CameraPreviewState extends State<CameraPreview> {
 
   @override
   Widget build(BuildContext context) {
-    final initialized = widget.camera.initialized;
-    if (!initialized) return const Center(child: CircularProgressIndicator());
+    final camera = widget.camera;
 
-    final id = widget.camera.id;
+    if (!camera.initialized) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final id = camera.id;
     if (id == null) return const Icon(Icons.warning);
 
-    final frontCamera = widget.camera.direction == .front;
+    final size = camera.size;
+    if (size == null) {
+      return camera.paused
+          ? const SizedBox.shrink()
+          : const Center(child: CircularProgressIndicator());
+    }
+
+    final frontCamera = camera.direction == .front;
 
     return ClipRect(
       child: FittedBox(
@@ -94,8 +104,8 @@ class _CameraPreviewState extends State<CameraPreview> {
         child: Transform.flip(
           flipX: frontCamera && widget.mirror,
           child: SizedBox(
-            width: widget.camera.size.$1.toDouble(),
-            height: widget.camera.size.$2.toDouble(),
+            width: size.$1.toDouble(),
+            height: size.$2.toDouble(),
             child: Texture(textureId: id),
           ),
         ),

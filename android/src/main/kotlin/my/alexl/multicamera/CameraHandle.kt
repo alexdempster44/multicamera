@@ -50,16 +50,15 @@ class CameraHandle(
     var surfaceProducers = listOf<TextureRegistry.SurfaceProducer>()
         set(value) {
             field = value
-            previewFanOut.surfaces =
-                value.map {
-                    it.setSize(size.width, size.height)
-                    it.surface
-                }
+            previewFanOut.surfaces = previewSurfaces()
 
             setupSession()
         }
-    var size = Size(1, 1)
+
+    @Volatile
+    var size: Size? = null
         private set
+
     var quarterTurns = 0
         private set
 
@@ -157,6 +156,7 @@ class CameraHandle(
     private fun createSession() {
         if (session != null) return
         val device = device ?: return
+        val size = size ?: return
 
         val previewSurface = previewFanOut.ensureSurface(size)
 
@@ -202,7 +202,7 @@ class CameraHandle(
         }, handler)
         this.captureImageReader = captureImageReader
 
-        val recognitionSize = recognitionSize()
+        val recognitionSize = recognitionSize(size)
         val recognitionImageReader =
             ImageReader.newInstance(
                 recognitionSize.width,
@@ -294,18 +294,21 @@ class CameraHandle(
             characteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP) ?: return
         val sizes = streamConfigurationMap.getOutputSizes(SurfaceTexture::class.java)
 
-        val size = sizes.maxBy { it.width * it.height }
-        this.size = size
+        this.size = sizes.maxBy { it.width * it.height }
 
-        previewFanOut.refreshSurfaces(
-            surfaceProducers.map {
-                it.setSize(size.width, size.height)
-                it.surface
-            },
-        )
+        previewFanOut.refreshSurfaces(previewSurfaces())
     }
 
-    private fun recognitionSize(): Size {
+    private fun previewSurfaces(): List<Surface> {
+        val size = size ?: return emptyList()
+
+        return surfaceProducers.map {
+            it.setSize(size.width, size.height)
+            it.surface
+        }
+    }
+
+    private fun recognitionSize(size: Size): Size {
         val default =
             Size(
                 (size.width * 0.2).toInt().coerceAtLeast(1),
@@ -383,6 +386,7 @@ class CameraHandle(
     private fun setupSessionRequest(capture: Boolean = false) {
         val device = device ?: return
         val session = session ?: return
+        val size = size ?: return
 
         val previewSurface = previewFanOut.ensureSurface(size)
         val captureImageReader = captureImageReader ?: return

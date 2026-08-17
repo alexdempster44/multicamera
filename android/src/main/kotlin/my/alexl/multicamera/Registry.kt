@@ -123,8 +123,10 @@ class Registry(
         val handle = cameraHandles[direction] ?: return
         val cameras = cameras.values.filter { it.direction == direction && !it.paused }
 
-        var width = handle.size.width
-        var height = handle.size.height
+        val size = handle.size ?: return
+
+        var width = size.width
+        var height = size.height
         if (handle.quarterTurns % 2 == 1) {
             width = height.also { height = width }
         }
