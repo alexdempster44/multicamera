@@ -103,7 +103,7 @@ class PreviewFanOut(
     private fun drawFrame() {
         val surfaceTexture = surfaceTexture ?: return
 
-        egl.bindSurface(EGL14.EGL_NO_SURFACE)
+        egl.bindOffscreen()
         surfaceTexture.updateTexImage()
         surfaceTexture.getTransformMatrix(textureMatrix)
 
@@ -157,12 +157,13 @@ class EGL : Closeable {
         private set
 
     private var program: Program? = null
+    private var offscreen: EGLSurface? = null
 
     init {
         createDisplay()
         createConfig()
         createContext()
-        bindSurface(EGL14.EGL_NO_SURFACE)
+        bindOffscreen()
         createTexture()
     }
 
@@ -187,7 +188,7 @@ class EGL : Closeable {
                 EGL14.EGL_RENDERABLE_TYPE,
                 EGL14.EGL_OPENGL_ES2_BIT,
                 EGL14.EGL_SURFACE_TYPE,
-                EGL14.EGL_WINDOW_BIT,
+                EGL14.EGL_WINDOW_BIT or EGL14.EGL_PBUFFER_BIT,
                 EGLExt.EGL_RECORDABLE_ANDROID,
                 1,
                 EGL14.EGL_NONE,
@@ -257,6 +258,20 @@ class EGL : Closeable {
         EGL14.eglMakeCurrent(display, surface, surface, context)
     }
 
+    fun bindOffscreen() {
+        val surface =
+            offscreen ?: run {
+                val attributes =
+                    intArrayOf(EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE)
+                val surface = EGL14.eglCreatePbufferSurface(display, config, attributes, 0)
+
+                this.offscreen = surface
+                surface
+            }
+
+        bindSurface(surface)
+    }
+
     fun drawSurface(
         surface: EGLSurface,
         textureMatrix: FloatArray,
@@ -298,6 +313,9 @@ class EGL : Closeable {
 
         program?.close()
         program = null
+
+        offscreen?.also { EGL14.eglDestroySurface(display, it) }
+        offscreen = null
 
         EGL14.eglDestroyContext(display, context)
         EGL14.eglTerminate(display)
