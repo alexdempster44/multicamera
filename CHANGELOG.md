@@ -1,3 +1,10 @@
+## v1.12.0
+
+- **Breaking:** `Camera.size` is now nullable, and returns `null` until the preview size is known
+- (iOS) Apply the camera orientation to the first frame, removing the jump when a camera is first opened
+- (iOS) Use an injected simulator camera when one is present, and fall back to the placeholder when the device cannot be opened
+- (Android) Bind a 1x1 pbuffer instead of `EGL_NO_SURFACE` for offscreen work, which fixes a crash on the Android emulator
+
 ## v1.11.0
 
 - Add a `playSound` option to `Camera.captureImage` to play the system shutter sound when capturing
