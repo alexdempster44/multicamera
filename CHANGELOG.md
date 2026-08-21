@@ -1,3 +1,7 @@
+## v1.12.1
+
+- (iOS) Resolve the preview orientation from the application window scene, fixing a sideways camera feed while the device is screen-mirrored
+
 ## v1.12.0
 
 - **Breaking:** `Camera.size` is now nullable, and returns `null` until the preview size is known
