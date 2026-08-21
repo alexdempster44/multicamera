@@ -397,8 +397,12 @@ class CameraHandle: NSObject {
   }
 
   private func interfaceQuarterTurns() -> Int32? {
+    let applicationScenes = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .filter { $0.session.role == .windowApplication }
     let windowScene =
-      UIApplication.shared.connectedScenes.first as? UIWindowScene
+      applicationScenes.first { $0.activationState == .foregroundActive }
+      ?? applicationScenes.first
 
     guard let interfaceOrientation = windowScene?.interfaceOrientation
     else { return nil }
