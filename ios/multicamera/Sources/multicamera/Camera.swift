@@ -33,12 +33,18 @@ class Camera: NSObject, FlutterTexture {
   }
 
   func close() {
+    lock.lock()
+    defer { lock.unlock() }
+
+    guard let id = id else { return }
+    self.id = nil
+    latestPixelBuffer = nil
     plugin.textures.unregisterTexture(id)
   }
 
   func copyPixelBuffer() -> Unmanaged<CVPixelBuffer>? {
     lock.lock()
-    let buffer = latestPixelBuffer
+    let buffer = id == nil ? nil : latestPixelBuffer
     lock.unlock()
 
     guard let buffer = buffer else { return nil }
@@ -47,9 +53,10 @@ class Camera: NSObject, FlutterTexture {
 
   func updateFrame(_ pixelBuffer: CVPixelBuffer) {
     lock.lock()
-    latestPixelBuffer = pixelBuffer
-    lock.unlock()
+    defer { lock.unlock() }
 
+    guard let id = id else { return }
+    latestPixelBuffer = pixelBuffer
     plugin.textures.textureFrameAvailable(id)
   }
 

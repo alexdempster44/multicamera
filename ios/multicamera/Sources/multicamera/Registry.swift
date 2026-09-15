@@ -76,15 +76,25 @@ class Registry {
   }
 
   func unregisterCamera(id: Int64) {
-    cameras.removeValue(forKey: id)?.close()
+    let camera = cameras.removeValue(forKey: id)
     reconcile()
+    camera?.close()
   }
 
   func reset() {
-    for camera in cameras.values { camera.close() }
-    cameras.removeAll()
-    for handle in cameraHandles.values { handle.close() }
-    cameraHandles.removeAll()
+    let body = { [weak self] in
+      guard let self = self else { return }
+      for handle in self.cameraHandles.values { handle.close() }
+      self.cameraHandles.removeAll()
+      for camera in self.cameras.values { camera.close() }
+      self.cameras.removeAll()
+    }
+
+    if Thread.isMainThread {
+      body()
+    } else {
+      DispatchQueue.main.async(execute: body)
+    }
   }
 
   private func reconcile() {
@@ -137,16 +147,16 @@ class Registry {
   }
 
   private func updateFlutterCameras(_ direction: Camera.Direction) {
-    guard let handle = cameraHandles[direction] else { return }
-    let cameras = cameras.values.filter {
-      $0.direction == direction && !$0.paused
-    }
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else { return }
+      guard let handle = self.cameraHandles[direction] else { return }
+      guard let (width, height) = handle.size else { return }
 
-    guard let (width, height) = handle.size else { return }
-
-    for camera in cameras {
-      guard let id = camera.id else { continue }
-      DispatchQueue.main.async {
+      let cameras = self.cameras.values.filter {
+        $0.direction == direction && !$0.paused
+      }
+      for camera in cameras {
+        guard let id = camera.id else { continue }
         self.plugin.channel.invokeMethod(
           "updateCamera",
           arguments: [
@@ -176,13 +186,14 @@ class Registry {
     _ direction: Camera.Direction,
     _ results: [String: Any]
   ) {
-    let cameras = cameras.values.filter {
-      $0.direction == direction && !$0.paused
-    }
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else { return }
+      let cameras = self.cameras.values.filter {
+        $0.direction == direction && !$0.paused
+      }
 
-    for camera in cameras {
-      guard let id = camera.id else { continue }
-      DispatchQueue.main.async {
+      for camera in cameras {
+        guard let id = camera.id else { continue }
         self.plugin.channel.invokeMethod(
           "recognitionResults",
           arguments: results.merging(["id": id]) { current, _ in current }

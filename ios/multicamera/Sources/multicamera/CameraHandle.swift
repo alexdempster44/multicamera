@@ -11,9 +11,7 @@ class CameraHandle: NSObject {
   let onFace: ((Bool) -> Void)
 
   var size: (Int32, Int32)? {
-    stateLock.lock()
-    defer { stateLock.unlock() }
-    return currentSize
+    withState { currentSize }
   }
 
   private static let session: AVCaptureSession = {
@@ -34,9 +32,7 @@ class CameraHandle: NSObject {
   private var currentQuarterTurns: Int32 = 1
 
   private var quarterTurns: Int32 {
-    stateLock.lock()
-    defer { stateLock.unlock() }
-    return currentQuarterTurns
+    withState { currentQuarterTurns }
   }
 
   private static let captureCompressionQuality: CGFloat = 0.8
@@ -98,24 +94,29 @@ class CameraHandle: NSObject {
   }
 
   func close() {
-    output.setSampleBufferDelegate(nil, queue: nil)
-    cameras = []
-    for entry in pendingCaptureCallbacks {
-      entry.callback(nil)
+    let callbacks: [PendingCapture] = withState {
+      cameras = []
+      let callbacks = pendingImmediateCaptureCallbacks + pendingCaptureCallbacks
+      pendingImmediateCaptureCallbacks = []
+      pendingCaptureCallbacks = []
+      return callbacks
     }
-    pendingCaptureCallbacks = []
-    for entry in pendingImmediateCaptureCallbacks {
-      entry.callback(nil)
+    for entry in callbacks {
+      DispatchQueue.main.async { entry.callback(nil) }
     }
-    pendingImmediateCaptureCallbacks = []
 
-    Self.sessionQueue.async { [self] in self.closeDevice() }
+    Self.sessionQueue.async { [self] in
+      output.setSampleBufferDelegate(nil, queue: nil)
+      metadataOutput.setMetadataObjectsDelegate(nil, queue: nil)
+      self.closeDevice()
+    }
 
     NotificationCenter.default.removeObserver(self)
   }
 
   func setCameras(_ cameras: [Camera]) {
-    self.cameras = cameras
+    withState { self.cameras = cameras }
+
     setupDevice()
   }
 
@@ -124,15 +125,20 @@ class CameraHandle: NSObject {
     scanBarcodes: Bool,
     detectFaces: Bool
   ) {
-    self.recognizeText = recognizeText
-    self.scanBarcodes = scanBarcodes
-    self.detectFaces = detectFaces
-    self.lastFace = nil
+    withState {
+      self.recognizeText = recognizeText
+      self.scanBarcodes = scanBarcodes
+      self.detectFaces = detectFaces
+      self.lastFace = nil
+    }
     Self.sessionQueue.async { [weak self] in self?.applyMetadataTypes() }
   }
 
   private func applyMetadataTypes() {
-    guard device != nil else { return }
+    let (hasDevice, scanBarcodes, detectFaces) = withState {
+      (device != nil, self.scanBarcodes, self.detectFaces)
+    }
+    guard hasDevice else { return }
 
     let available = metadataOutput.availableMetadataObjectTypes
     var types: [AVMetadataObject.ObjectType] = []
@@ -151,52 +157,64 @@ class CameraHandle: NSObject {
     playSound: Bool,
     _ callback: @escaping (Data?) -> Void
   ) {
-    nextCaptureID += 1
-    let pending = PendingCapture(
-      id: nextCaptureID,
-      mirror: mirror,
-      playSound: playSound,
-      callback: callback
-    )
-    if immediate {
-      pendingImmediateCaptureCallbacks.append(pending)
-    } else {
-      pendingCaptureCallbacks.append(pending)
+    let id = withState { () -> Int64 in
+      nextCaptureID += 1
+      let pending = PendingCapture(
+        id: nextCaptureID,
+        mirror: mirror,
+        playSound: playSound,
+        callback: callback
+      )
+      if immediate {
+        pendingImmediateCaptureCallbacks.append(pending)
+      } else {
+        pendingCaptureCallbacks.append(pending)
+      }
+      return pending.id
     }
 
     DispatchQueue.global(qos: .userInitiated).asyncAfter(
       deadline: .now() + Self.captureTimeout
     ) { [weak self] in
-      self?.expireCapture(pending.id)
+      self?.expireCapture(id)
     }
 
     setupDevice()
   }
 
   private func expireCapture(_ id: Int64) {
-    let expired: PendingCapture?
-    if let index = pendingImmediateCaptureCallbacks.firstIndex(
-      where: { $0.id == id }
-    ) {
-      expired = pendingImmediateCaptureCallbacks.remove(at: index)
-    } else if let index = pendingCaptureCallbacks.firstIndex(
-      where: { $0.id == id }
-    ) {
-      expired = pendingCaptureCallbacks.remove(at: index)
-    } else {
-      expired = nil
+    let expired: PendingCapture? = withState {
+      if let index = pendingImmediateCaptureCallbacks.firstIndex(
+        where: { $0.id == id }
+      ) {
+        return pendingImmediateCaptureCallbacks.remove(at: index)
+      }
+      if let index = pendingCaptureCallbacks.firstIndex(where: { $0.id == id }) {
+        return pendingCaptureCallbacks.remove(at: index)
+      }
+      return nil
     }
 
     guard let expired = expired else { return }
-    expired.callback(nil)
+    DispatchQueue.main.async { expired.callback(nil) }
+
+    setupDevice()
+  }
+
+  private func withState<T>(_ body: () -> T) -> T {
+    stateLock.lock()
+    defer { stateLock.unlock() }
+    return body()
   }
 
   private func setupDevice() {
     Self.sessionQueue.async { [weak self] in
       guard let self = self else { return }
-      if !cameras.isEmpty || !pendingCaptureCallbacks.isEmpty
-        || !pendingImmediateCaptureCallbacks.isEmpty
-      {
+      let required = self.withState {
+        !self.cameras.isEmpty || !self.pendingCaptureCallbacks.isEmpty
+          || !self.pendingImmediateCaptureCallbacks.isEmpty
+      }
+      if required {
         self.createDevice()
       } else {
         self.closeDevice()
@@ -205,7 +223,7 @@ class CameraHandle: NSObject {
   }
 
   private func createDevice() {
-    if device != nil { return }
+    if withState({ device != nil }) { return }
     if openDevice() { return }
 
     #if targetEnvironment(simulator)
@@ -238,7 +256,7 @@ class CameraHandle: NSObject {
 
     Self.session.commitConfiguration()
 
-    self.device = device
+    withState { self.device = device }
     Self.referenceCount += 1
     if Self.referenceCount == 1 {
       Self.session.startRunning()
@@ -294,7 +312,7 @@ class CameraHandle: NSObject {
     let rotated = rotatePixelBuffer(buffer, quarterTurns: quarterTurns)
     let data = rotated ?? buffer
 
-    for camera in cameras {
+    for camera in withState({ cameras }) {
       camera.updateFrame(data)
     }
 
@@ -302,10 +320,10 @@ class CameraHandle: NSObject {
 
     let exposureStable = exposureStable()
 
-    let hasStableCapture =
-      !pendingCaptureCallbacks.isEmpty && exposureStable
-    let hasImmediateCapture = !pendingImmediateCaptureCallbacks.isEmpty
-    let hasCapture = hasStableCapture || hasImmediateCapture
+    let hasCapture = withState {
+      !pendingImmediateCaptureCallbacks.isEmpty
+        || (!pendingCaptureCallbacks.isEmpty && exposureStable)
+    }
 
     if hasCapture, let image = convertDataToImage(data) {
       var encodedData: [Bool: Data?] = [:]
@@ -320,11 +338,14 @@ class CameraHandle: NSObject {
         return imageData
       }
 
-      var callbacks = pendingImmediateCaptureCallbacks
-      pendingImmediateCaptureCallbacks = []
-      if exposureStable {
-        callbacks += pendingCaptureCallbacks
-        pendingCaptureCallbacks = []
+      let callbacks: [PendingCapture] = withState {
+        var callbacks = pendingImmediateCaptureCallbacks
+        pendingImmediateCaptureCallbacks = []
+        if exposureStable {
+          callbacks += pendingCaptureCallbacks
+          pendingCaptureCallbacks = []
+        }
+        return callbacks
       }
 
       if callbacks.contains(where: { $0.playSound }) {
@@ -333,18 +354,23 @@ class CameraHandle: NSObject {
 
       for entry in callbacks {
         let imageData = capturedData(mirror: entry.mirror)
-        Task { entry.callback(imageData) }
+        DispatchQueue.main.async { entry.callback(imageData) }
       }
     }
 
     guard let rotated = rotated else { return }
-    guard recognizeText, !recognitionInFlight else { return }
-    recognitionInFlight = true
+
+    let startRecognition = withState {
+      guard recognizeText, !recognitionInFlight else { return false }
+      recognitionInFlight = true
+      return true
+    }
+    guard startRecognition else { return }
 
     recognitionQueue.async { [weak self] in
       guard let self = self else { return }
       self.onTextImage(rotated)
-      self.recognitionInFlight = false
+      self.withState { self.recognitionInFlight = false }
     }
   }
 
@@ -352,10 +378,11 @@ class CameraHandle: NSObject {
     let width = Int32(CVPixelBufferGetWidth(data))
     let height = Int32(CVPixelBufferGetHeight(data))
 
-    stateLock.lock()
-    let changed = currentSize?.0 != width || currentSize?.1 != height
-    currentSize = (width, height)
-    stateLock.unlock()
+    let changed = withState {
+      let changed = currentSize?.0 != width || currentSize?.1 != height
+      currentSize = (width, height)
+      return changed
+    }
 
     guard changed else { return }
     DispatchQueue.main.async { [self] in onCameraUpdated() }
@@ -415,7 +442,7 @@ class CameraHandle: NSObject {
   }
 
   private func exposureStable() -> Bool {
-    guard let device = device else { return false }
+    guard let device = withState({ self.device }) else { return false }
     return !device.isAdjustingExposure
       && abs(device.exposureTargetOffset) < Self.stableExposureOffset
   }
@@ -424,9 +451,7 @@ class CameraHandle: NSObject {
     DispatchQueue.main.async { [self] in
       guard let quarterTurns = interfaceQuarterTurns() else { return }
 
-      stateLock.lock()
-      currentQuarterTurns = quarterTurns
-      stateLock.unlock()
+      withState { currentQuarterTurns = quarterTurns }
     }
   }
 
@@ -458,7 +483,7 @@ class CameraHandle: NSObject {
   }
 
   private func closeDevice() {
-    guard let device = device else { return }
+    guard let device = withState({ self.device }) else { return }
 
     Self.session.beginConfiguration()
     Self.session.removeOutput(output)
@@ -476,7 +501,7 @@ class CameraHandle: NSObject {
     }
     Self.session.commitConfiguration()
 
-    self.device = nil
+    withState { self.device = nil }
     Self.referenceCount -= 1
     if Self.referenceCount == 0 {
       Self.session.stopRunning()
@@ -486,22 +511,25 @@ class CameraHandle: NSObject {
   #if targetEnvironment(simulator)
     private func showSimulatorWarning() {
       if let buffer = SimulatorWarning.pixelBuffer(for: direction) {
-        for camera in cameras {
+        for camera in withState({ cameras }) {
           camera.updateFrame(buffer)
         }
 
         updateSize(buffer)
       }
 
-      let callbacks =
-        pendingImmediateCaptureCallbacks + pendingCaptureCallbacks
-      pendingImmediateCaptureCallbacks = []
-      pendingCaptureCallbacks = []
+      let callbacks: [PendingCapture] = withState {
+        let callbacks =
+          pendingImmediateCaptureCallbacks + pendingCaptureCallbacks
+        pendingImmediateCaptureCallbacks = []
+        pendingCaptureCallbacks = []
+        return callbacks
+      }
       guard !callbacks.isEmpty else { return }
 
       let data = SimulatorWarning.imageData(for: direction)
       for entry in callbacks {
-        entry.callback(data)
+        DispatchQueue.main.async { entry.callback(data) }
       }
     }
   #endif
@@ -533,6 +561,10 @@ extension CameraHandle: AVCaptureMetadataOutputObjectsDelegate {
     didOutput metadataObjects: [AVMetadataObject],
     from connection: AVCaptureConnection
   ) {
+    let (scanBarcodes, detectFaces) = withState {
+      (self.scanBarcodes, self.detectFaces)
+    }
+
     if scanBarcodes {
       let barcodes = metadataObjects.compactMap {
         ($0 as? AVMetadataMachineReadableCodeObject)?.stringValue
@@ -541,10 +573,12 @@ extension CameraHandle: AVCaptureMetadataOutputObjectsDelegate {
     }
     if detectFaces {
       let hasFace = metadataObjects.contains { $0.type == .face }
-      if hasFace != lastFace {
+      let changed = withState {
+        guard self.detectFaces, hasFace != lastFace else { return false }
         lastFace = hasFace
-        onFace(hasFace)
+        return true
       }
+      if changed { onFace(hasFace) }
     }
   }
 }
