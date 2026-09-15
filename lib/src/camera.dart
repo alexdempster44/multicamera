@@ -159,20 +159,24 @@ class Camera extends ChangeNotifier {
     final completer = Completer<void>();
     _initializeLock = completer.future;
 
-    final id = await MulticameraPlatform.instance.registerCamera(
-      _direction,
-      _paused,
-      _onTextRecognized != null,
-      _onBarcodesScanned != null,
-      _onFaceDetected != null,
-    );
-    if (id == null) return;
+    try {
+      final id = await MulticameraPlatform.instance.registerCamera(
+        _direction,
+        _paused,
+        _onTextRecognized != null,
+        _onBarcodesScanned != null,
+        _onFaceDetected != null,
+      );
+      if (id == null) return;
 
-    _id = id;
-    _instances[id] = this;
-    _initialized = true;
-    completer.complete();
-    _initializeLock = null;
+      _id = id;
+      _instances[id] = this;
+      _initialized = true;
+    } finally {
+      completer.complete();
+      _initializeLock = null;
+    }
+
     notifyListeners();
   }
 
@@ -226,23 +230,23 @@ class Camera extends ChangeNotifier {
     if (_pendingUpdate) return;
     _pendingUpdate = true;
 
-    if (_initializeLock case final future?) await future;
+    try {
+      if (_initializeLock case final future?) await future;
 
-    final id = _id;
-    if (!_initialized || id == null) {
+      final id = _id;
+      if (!_initialized || id == null) return;
+
+      MulticameraPlatform.instance.updateCamera(
+        id,
+        _direction,
+        _paused,
+        _onTextRecognized != null,
+        _onBarcodesScanned != null,
+        _onFaceDetected != null,
+      );
+    } finally {
       _pendingUpdate = false;
-      return;
     }
-
-    MulticameraPlatform.instance.updateCamera(
-      id,
-      _direction,
-      _paused,
-      _onTextRecognized != null,
-      _onBarcodesScanned != null,
-      _onFaceDetected != null,
-    );
-    _pendingUpdate = false;
   }
 
   /// Disposes of the camera and releases associated resources.
