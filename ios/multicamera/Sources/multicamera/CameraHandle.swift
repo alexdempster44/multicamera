@@ -40,6 +40,7 @@ class CameraHandle: NSObject {
   }
 
   private static let captureCompressionQuality: CGFloat = 0.8
+  private static let captureTimeout: TimeInterval = 5
   private static let stableExposureOffset: Float = 0.5
 
   private static let shutterSoundID: SystemSoundID = 1108
@@ -50,10 +51,9 @@ class CameraHandle: NSObject {
   private let recognitionQueue: DispatchQueue
   private let ciContext = CIContext()
   private var cameras: [Camera] = []
-  private var pendingCaptureCallbacks:
-    [(mirror: Bool, playSound: Bool, callback: (Data?) -> Void)] = []
-  private var pendingImmediateCaptureCallbacks:
-    [(mirror: Bool, playSound: Bool, callback: (Data?) -> Void)] = []
+  private var pendingCaptureCallbacks: [PendingCapture] = []
+  private var pendingImmediateCaptureCallbacks: [PendingCapture] = []
+  private var nextCaptureID: Int64 = 0
   private var recognitionInFlight = false
   private var recognizeText = false
   private var scanBarcodes = false
@@ -151,12 +151,44 @@ class CameraHandle: NSObject {
     playSound: Bool,
     _ callback: @escaping (Data?) -> Void
   ) {
+    nextCaptureID += 1
+    let pending = PendingCapture(
+      id: nextCaptureID,
+      mirror: mirror,
+      playSound: playSound,
+      callback: callback
+    )
     if immediate {
-      pendingImmediateCaptureCallbacks.append((mirror, playSound, callback))
+      pendingImmediateCaptureCallbacks.append(pending)
     } else {
-      pendingCaptureCallbacks.append((mirror, playSound, callback))
+      pendingCaptureCallbacks.append(pending)
     }
+
+    DispatchQueue.global(qos: .userInitiated).asyncAfter(
+      deadline: .now() + Self.captureTimeout
+    ) { [weak self] in
+      self?.expireCapture(pending.id)
+    }
+
     setupDevice()
+  }
+
+  private func expireCapture(_ id: Int64) {
+    let expired: PendingCapture?
+    if let index = pendingImmediateCaptureCallbacks.firstIndex(
+      where: { $0.id == id }
+    ) {
+      expired = pendingImmediateCaptureCallbacks.remove(at: index)
+    } else if let index = pendingCaptureCallbacks.firstIndex(
+      where: { $0.id == id }
+    ) {
+      expired = pendingCaptureCallbacks.remove(at: index)
+    } else {
+      expired = nil
+    }
+
+    guard let expired = expired else { return }
+    expired.callback(nil)
   }
 
   private func setupDevice() {
@@ -473,6 +505,13 @@ class CameraHandle: NSObject {
       }
     }
   #endif
+
+  private struct PendingCapture {
+    let id: Int64
+    let mirror: Bool
+    let playSound: Bool
+    let callback: (Data?) -> Void
+  }
 }
 
 extension CameraHandle: AVCaptureVideoDataOutputSampleBufferDelegate {
