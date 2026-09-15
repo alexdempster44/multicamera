@@ -1,3 +1,14 @@
+## v1.13.0
+
+- **Breaking:** Require Flutter 3.47.0+ / Dart 3.13.0+
+- **Breaking:** (iOS) Raise minimum platform version to 15.0
+- (iOS) Fix a crash when a camera is disposed while a frame is in flight, caused by frames being delivered to a texture that has already been unregistered
+- (iOS) Recover the camera preview after a capture session interruption or runtime error instead of leaving it black
+- (iOS) Return `null` from `Camera.captureImage` after five seconds when no frame arrives, instead of never completing
+- (iOS) Recognize text on a dedicated queue from the camera's pixel buffer, removing an image conversion per recognition and replacing the fixed recognition interval with one recognition at a time, so results arrive as fast as the device can produce them
+- Fix `Camera.initialize` never completing when camera registration fails, which left every later call awaiting it forever
+- Fix camera property updates being silently dropped after a failed initialization
+
 ## v1.12.1
 
 - (iOS) Resolve the preview orientation from the application window scene, fixing a sideways camera feed while the device is screen-mirrored
