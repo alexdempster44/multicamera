@@ -35,8 +35,17 @@ class CameraHandle: NSObject {
     withState { currentQuarterTurns }
   }
 
+  private var deviceRequired: Bool {
+    withState {
+      !cameras.isEmpty || !pendingCaptureCallbacks.isEmpty
+        || !pendingImmediateCaptureCallbacks.isEmpty
+    }
+  }
+
   private static let captureCompressionQuality: CGFloat = 0.8
   private static let captureTimeout: TimeInterval = 5
+  private static let sessionRestartAttempts: Int = 5
+  private static let sessionRestartDelay: TimeInterval = 1
   private static let stableExposureOffset: Float = 0.5
 
   private static let shutterSoundID: SystemSoundID = 1108
@@ -51,6 +60,7 @@ class CameraHandle: NSObject {
   private var pendingImmediateCaptureCallbacks: [PendingCapture] = []
   private var nextCaptureID: Int64 = 0
   private var recognitionInFlight = false
+  private var restartInFlight = false
   private var recognizeText = false
   private var scanBarcodes = false
   private var detectFaces = false
@@ -87,6 +97,24 @@ class CameraHandle: NSObject {
       self,
       selector: #selector(handleOrientationChange),
       name: UIDevice.orientationDidChangeNotification,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleSessionInterruptionEnded),
+      name: AVCaptureSession.interruptionEndedNotification,
+      object: Self.session
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleSessionRuntimeError),
+      name: AVCaptureSession.runtimeErrorNotification,
+      object: Self.session
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(handleApplicationDidBecomeActive),
+      name: UIApplication.didBecomeActiveNotification,
       object: nil
     )
 
@@ -210,11 +238,7 @@ class CameraHandle: NSObject {
   private func setupDevice() {
     Self.sessionQueue.async { [weak self] in
       guard let self = self else { return }
-      let required = self.withState {
-        !self.cameras.isEmpty || !self.pendingCaptureCallbacks.isEmpty
-          || !self.pendingImmediateCaptureCallbacks.isEmpty
-      }
-      if required {
+      if self.deviceRequired {
         self.createDevice()
       } else {
         self.closeDevice()
@@ -247,6 +271,7 @@ class CameraHandle: NSObject {
     output.alwaysDiscardsLateVideoFrames = true
     output.setSampleBufferDelegate(self, queue: queue)
     guard Self.session.canAddOutput(output) else {
+      Self.session.removeInput(input)
       Self.session.commitConfiguration()
       return false
     }
@@ -258,7 +283,7 @@ class CameraHandle: NSObject {
 
     withState { self.device = device }
     Self.referenceCount += 1
-    if Self.referenceCount == 1 {
+    if !Self.session.isRunning {
       Self.session.startRunning()
     }
 
@@ -453,6 +478,61 @@ class CameraHandle: NSObject {
 
       withState { currentQuarterTurns = quarterTurns }
     }
+  }
+
+  @objc private func handleSessionInterruptionEnded() {
+    beginSessionRestart()
+  }
+
+  @objc private func handleSessionRuntimeError() {
+    beginSessionRestart()
+  }
+
+  @objc private func handleApplicationDidBecomeActive() {
+    beginSessionRestart()
+  }
+
+  private func beginSessionRestart() {
+    DispatchQueue.main.async { [weak self] in
+      guard let self = self else { return }
+      guard UIApplication.shared.applicationState != .background else {
+        return
+      }
+
+      let start = self.withState {
+        guard !self.restartInFlight else { return false }
+        self.restartInFlight = true
+        return true
+      }
+      guard start else { return }
+
+      Self.sessionQueue.async { [weak self] in
+        self?.restartSession(attempt: 0)
+      }
+    }
+  }
+
+  private func restartSession(attempt: Int) {
+    if deviceRequired {
+      if attempt == 0 {
+        Self.session.startRunning()
+      } else {
+        closeDevice()
+        _ = openDevice()
+      }
+
+      let recovered = Self.session.isRunning && withState { device != nil }
+      if !recovered, attempt + 1 < Self.sessionRestartAttempts {
+        Self.sessionQueue.asyncAfter(
+          deadline: .now() + Self.sessionRestartDelay
+        ) { [weak self] in
+          self?.restartSession(attempt: attempt + 1)
+        }
+        return
+      }
+    }
+
+    withState { restartInFlight = false }
   }
 
   private func interfaceQuarterTurns() -> Int32? {
