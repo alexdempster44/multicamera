@@ -1,23 +1,18 @@
-import UIKit
+import CoreVideo
 import Vision
 
 struct ImageRecognition {
   private init() {}
 
   static func recognizeText(
-    _ image: UIImage,
+    _ buffer: CVPixelBuffer,
     onResult: @escaping ([String]?) -> Void
   ) {
-    guard let cgImage = image.cgImage else {
-      onResult(nil)
-      return
-    }
-
     let request = VNRecognizeTextRequest()
     request.recognitionLevel = .accurate
     request.usesLanguageCorrection = true
 
-    let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+    let handler = VNImageRequestHandler(cvPixelBuffer: buffer, options: [:])
     do {
       try handler.perform([request])
     } catch {

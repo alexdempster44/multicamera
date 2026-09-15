@@ -121,8 +121,8 @@ class Registry {
       onCameraUpdated: { [weak self] in
         self?.updateFlutterCameras(direction)
       },
-      onTextImage: { [weak self] image in
-        self?.onTextImage(image, direction: direction)
+      onTextImage: { [weak self] buffer in
+        self?.onTextImage(buffer, direction: direction)
       },
       onBarcodes: { [weak self] barcodes in
         self?.sendRecognitionResults(direction, ["barcodes": barcodes])
@@ -160,11 +160,11 @@ class Registry {
   }
 
   private func onTextImage(
-    _ image: UIImage,
+    _ buffer: CVPixelBuffer,
     direction: Camera.Direction
   ) {
     ImageRecognition.recognizeText(
-      image,
+      buffer,
       onResult: { [weak self] text in
         guard let text = text else { return }
         self?.sendRecognitionResults(direction, ["text": text])

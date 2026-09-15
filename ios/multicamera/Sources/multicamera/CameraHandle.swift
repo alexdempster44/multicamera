@@ -6,7 +6,7 @@ import UIKit
 class CameraHandle: NSObject {
   let direction: Camera.Direction
   let onCameraUpdated: (() -> Void)
-  let onTextImage: ((UIImage) -> Void)
+  let onTextImage: ((CVPixelBuffer) -> Void)
   let onBarcodes: (([String]) -> Void)
   let onFace: ((Bool) -> Void)
 
@@ -40,7 +40,6 @@ class CameraHandle: NSObject {
   }
 
   private static let captureCompressionQuality: CGFloat = 0.8
-  private static let recognitionThrottleInterval: TimeInterval = 0.2
   private static let stableExposureOffset: Float = 0.5
 
   private static let shutterSoundID: SystemSoundID = 1108
@@ -48,13 +47,14 @@ class CameraHandle: NSObject {
   private let output = AVCaptureVideoDataOutput()
   private let metadataOutput = AVCaptureMetadataOutput()
   private let queue: DispatchQueue
+  private let recognitionQueue: DispatchQueue
   private let ciContext = CIContext()
   private var cameras: [Camera] = []
   private var pendingCaptureCallbacks:
     [(mirror: Bool, playSound: Bool, callback: (Data?) -> Void)] = []
   private var pendingImmediateCaptureCallbacks:
     [(mirror: Bool, playSound: Bool, callback: (Data?) -> Void)] = []
-  private var lastRecognitionTime: Date?
+  private var recognitionInFlight = false
   private var recognizeText = false
   private var scanBarcodes = false
   private var detectFaces = false
@@ -63,7 +63,7 @@ class CameraHandle: NSObject {
   init(
     direction: Camera.Direction,
     onCameraUpdated: @escaping (() -> Void),
-    onTextImage: @escaping ((UIImage) -> Void),
+    onTextImage: @escaping ((CVPixelBuffer) -> Void),
     onBarcodes: @escaping (([String]) -> Void),
     onFace: @escaping ((Bool) -> Void)
   ) {
@@ -75,6 +75,10 @@ class CameraHandle: NSObject {
     self.queue = DispatchQueue(
       label: "my.alexl.multicamera.\(direction)",
       qos: .userInitiated
+    )
+    self.recognitionQueue = DispatchQueue(
+      label: "my.alexl.multicamera.\(direction).recognition",
+      qos: .default
     )
     super.init()
 
@@ -254,8 +258,9 @@ class CameraHandle: NSObject {
     }.first
   }
 
-  private func onPixelBuffer(_ data: CVPixelBuffer) {
-    let data = rotatePixelBuffer(data, quarterTurns: quarterTurns) ?? data
+  private func onPixelBuffer(_ buffer: CVPixelBuffer) {
+    let rotated = rotatePixelBuffer(buffer, quarterTurns: quarterTurns)
+    let data = rotated ?? buffer
 
     for camera in cameras {
       camera.updateFrame(data)
@@ -300,17 +305,14 @@ class CameraHandle: NSObject {
       }
     }
 
-    guard recognizeText else { return }
+    guard let rotated = rotated else { return }
+    guard recognizeText, !recognitionInFlight else { return }
+    recognitionInFlight = true
 
-    let now = Date()
-    let elapsed = now.timeIntervalSince(
-      lastRecognitionTime ?? Date.distantPast
-    )
-
-    if elapsed < Self.recognitionThrottleInterval { return }
-    if let image = convertDataToImage(data) {
-      self.lastRecognitionTime = now
-      Task { onTextImage(image) }
+    recognitionQueue.async { [weak self] in
+      guard let self = self else { return }
+      self.onTextImage(rotated)
+      self.recognitionInFlight = false
     }
   }
 
